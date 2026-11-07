@@ -10,14 +10,12 @@ st.set_page_config(page_title="CoC Multi-Account Dashboard", layout="wide", page
 if "favorites" not in st.session_state:
     st.session_state.favorites = set()
 
-# CSS élégant pour cibler et illuminer les cartes MAX avec une belle bordure et une lueur
+# CSS pour colorer les barres de progression en vert lorsque l'élément est max
 st.markdown("""
 <style>
-    /* Style pour les cartes au niveau MAX (bordure verte lumineuse) */
-    .max-glow {
-        border: 2px solid #22c55e !important;
-        box-shadow: 0 0 12px rgba(34, 197, 94, 0.3);
-        border-radius: 10px;
+    /* Cible les barres de progression dans les conteneurs max pour les passer en vert */
+    div.row-widget.stProgress div[data-baseweb="progress-bar"] > div {
+        background-color: #3b82f6; /* Bleu par défaut */
     }
 </style>
 """, unsafe_allow_html=True)
@@ -125,13 +123,7 @@ def render_card(name, lvl, max_lvl, icon="⚔️"):
     is_fav = name in st.session_state.favorites
     fav_icon = "⭐" if is_fav else "☆"
     
-    # On applique la classe CSS "max-glow" uniquement si l'élément est max
-    wrapper_class = "max-glow" if is_max else ""
-    
     with st.container(border=True):
-        if is_max:
-            st.markdown(f'<div class="{wrapper_class}">', unsafe_allow_html=True)
-            
         col_t, col_btn = st.columns([0.8, 0.2])
         with col_t:
             st.markdown(f"**{icon} {name}**")
@@ -148,10 +140,17 @@ def render_card(name, lvl, max_lvl, icon="⚔️"):
         else:
             st.caption(status_text)
             
-        st.progress(progress)
-        
+        # Astuce propre : pour colorer la jauge en vert si max, on injecte un style spécifique ou on utilise le rendu natif
         if is_max:
-            st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown("""
+                <style>
+                div[data-testid="stProgress"] > div > div > div > div {
+                    background-color: #22c55e !important;
+                }
+                </style>
+            """, unsafe_allow_html=True)
+            
+        st.progress(progress)
 
 # -------------------------------------------------------------------
 # 2. APP LAYOUT
@@ -208,7 +207,7 @@ else:
                 
         st.subheader("🐾 Familiers de Héros (Pets)")
         raw_troops_for_pets = data.get("troops", [])
-        pets = [t for t in raw_troops_for_pets if t.get("name") in HERO_PETS_LIST]
+        pets = [t for t in raw_troops_for_pets if t.get("name"] in HERO_PETS_LIST]
         sorted_pets = sort_by_favorites(pets)
         
         if sorted_pets:
