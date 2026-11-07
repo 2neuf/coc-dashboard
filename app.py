@@ -51,6 +51,9 @@ def init_db():
         )
     """)
 
+import urllib.parse
+import re
+
 def fetch_player_data(player_tag: str):
     # Nettoyage rigoureux : enlève les espaces et force les majuscules
     clean_tag = player_tag.strip().upper()
@@ -72,7 +75,6 @@ def fetch_player_data(player_tag: str):
         return response.json(), None
     else:
         return None, f"Error {response.status_code}: {response.json().get('message', 'Failed to fetch data')}"
-
 # -------------------------------------------------------------------
 # 2. APP LAYOUT
 # -------------------------------------------------------------------
