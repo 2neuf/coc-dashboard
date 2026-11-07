@@ -147,9 +147,6 @@ SIEGE_MACHINES_LIST = [
     "Siege Barracks", "Log Launcher", "Flame Flinger", "Battle Drill"
 ]
 
-# Liste officielle des 4 héros du village principal
-OFFICIAL_HEROES = ["Barbarian King", "Archer Queen", "Grand Warden", "Royal Champion"]
-
 def get_icon_emoji(name):
     n = name.lower()
     if "king" in n: return "👑"
@@ -428,19 +425,16 @@ else:
             st.info("Aucun sort trouvé.")
 
     # -------------------------------------------------------------------
-    # TAB 4: PARAMÉTRAGE DES COMPOSITIONS D'ATTAQUE (Hors formulaire pour affichage dynamique)
+    # TAB 4: PARAMÉTRAGE DES COMPOSITIONS D'ATTAQUE (Tous les héros disponibles)
     # -------------------------------------------------------------------
     with tab_config:
         st.subheader("⚙️ Paramétrage des Compositions d'Attaque")
         
         comp_title = st.text_input("Nom de la composition (ex: Root Rider Spam)")
         
-        st.markdown("### 👑 Sélection des Héros (Max 4)")
-        player_heroes = [h['name'] for h in data.get("heroes", []) if h.get("village") == "home"]
-        # Filtrer uniquement sur les vrais héros officiels possédés par le joueur
-        available_heroes = [h for h in OFFICIAL_HEROES if h in player_heroes]
-        if not available_heroes:
-            available_heroes = player_heroes # Fallback si besoin
+        st.markdown("### 👑 Sélection des Héros")
+        # Récupère tous les héros du village principal du joueur (jusqu'à ses 6 héros)
+        available_heroes = [h['name'] for h in data.get("heroes", []) if h.get("village") == "home"]
             
         hero_labels = [f"{get_icon_emoji(h)} {h}" for h in available_heroes]
         hero_map = {f"{get_icon_emoji(h)} {h}": h for h in available_heroes}
