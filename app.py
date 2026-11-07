@@ -126,11 +126,17 @@ def fetch_player_data(player_tag: str):
             err_msg = response.text
         return None, f"Erreur API ({response.status_code}) : {err_msg}"
 
-# Liste officielle des familiers
+# Liste officielle des familiers (avec Sneezy)
 HERO_PETS_LIST = [
     "L.A.S.S.I", "Mighty Yak", "Electro Owl", "Unicorn", 
     "Phoenix", "Poison Lizard", "Diggy", "Frosty", 
     "Spirit Fox", "Angry Jelly", "Sneezy"
+]
+
+# Liste officielle des engins de siège
+SIEGE_MACHINES_LIST = [
+    "Wall Wreck", "Battle Blimp", "Stone Slammer", 
+    "Siege Barracks", "Log Launcher", "Flame Flinger", "Battle Drill"
 ]
 
 def get_icon_emoji(name):
@@ -166,6 +172,7 @@ def get_icon_emoji(name):
     if "frosty" in n: return "🧊"
     if "fox" in n: return "🦊"
     if "jelly" in n: return "🪼"
+    if "blimp" in n or "slammer" in n or "flinger" in n or "launcher" in n or "barracks" in n or "drill" in n: return "🛒"
     return "⚔️"
 
 def sort_items(items, current_favorites):
@@ -309,13 +316,14 @@ else:
 
     with tab_troops:
         st.subheader("🧪 Progression des Troupes (Village Principal)")
-        raw_troops = [t for t in data.get("troops", []) if t.get("village") == "home"]
+        raw_troops = [t for t in data.get("troops", []) if t.get("village"] == "home"]
         
         def should_exclude(name):
             name_lower = name.lower()
             is_super = "super" in name_lower or name in ["Sneaky Goblin", "Rocket Balloon", "Inferno Dragon"]
             is_pet = name in HERO_PETS_LIST
-            return is_super or is_pet
+            is_siege = name in SIEGE_MACHINES_LIST
+            return is_super or is_pet or is_siege
         
         troops = [t for t in raw_troops if not should_exclude(t.get("name", ""))]
         sorted_troops = sort_items(troops, current_favorites)
@@ -329,8 +337,21 @@ else:
         else:
             st.info("Aucune troupe trouvée.")
 
+        st.subheader("🛒 Engins de Siège")
+        siege_machines = [t for t in raw_troops if t.get("name") in SIEGE_MACHINES_LIST]
+        sorted_siege = sort_items(siege_machines, current_favorites)
+        
+        if sorted_siege:
+            siege_cols = st.columns(4)
+            for idx, siege in enumerate(sorted_siege):
+                col = siege_cols[idx % 4]
+                with col:
+                    render_card(siege['name'], siege.get("level"), siege.get("maxLevel"), current_tag, current_favorites, get_icon_emoji(siege['name']))
+        else:
+            st.info("Aucun engin de siège trouvé.")
+
         st.subheader("⚡ Progression des Sorts (Village Principal)")
-        spells = [s for s in data.get("spells", []) if s.get("village") == "home"]
+        spells = [s for s in data.get("spells", []) if s.get("village"] == "home"]
         sorted_spells = sort_items(spells, current_favorites)
         
         if sorted_spells:
