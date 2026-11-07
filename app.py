@@ -169,14 +169,6 @@ def get_icon_emoji(name):
     return "⚔️"
 
 def sort_items(items, current_favorites):
-    """
-    Règle de tri globale :
-    1. Statut favori prioritaire absolu (basé sur la DB).
-       - Entre favoris : tri par plus petite différence de niveaux (max favoris à la fin des favoris).
-    2. Pour les non-favoris :
-       - D'abord les éléments en cours de progression (triés par plus petite différence de niveau).
-       - Enfin les éléments MAX à la toute fin.
-    """
     def get_diff(item):
         lvl = item.get('level', 0)
         max_lvl = item.get('maxLevel', 0)
@@ -244,12 +236,11 @@ except Exception as e:
     st.sidebar.error(f"❌ DB Error: {e}")
 
 current_tag = "#YJ0U9P89V"
-player_name = "Mini" # Joueur défini en dur
+player_name = "Mini"
 
 st.sidebar.header("Account Active")
 st.sidebar.info(f"Pseudo : **{player_name}**\nTag : **{current_tag}**")
 
-# Récupération des favoris de ce joueur depuis la base de données Turso
 current_favorites = get_db_favorites(current_tag)
 
 with st.spinner("Fetching data from Supercell API..."):
@@ -292,7 +283,7 @@ else:
                 
         st.subheader("🐾 Familiers de Héros (Pets)")
         raw_troops_for_pets = data.get("troops", [])
-        pets = [t for t in raw_troops_for_pets if t.get("name"] in HERO_PETS_LIST]
+        pets = [t for t in raw_troops_for_pets if t.get("name") in HERO_PETS_LIST]
         sorted_pets = sort_items(pets, current_favorites)
         
         if sorted_pets:
