@@ -166,4 +166,22 @@ else:
         
         if spells:
             spell_cols = st.columns(4)
-            for idx
+            for idx, spell in enumerate(spells):
+                col = spell_cols[idx % 4]
+                lvl = spell.get("level")
+                max_lvl = spell.get("maxLevel")
+                remaining = max_lvl - lvl
+                
+                with col:
+                    if remaining == 0:
+                        st.success(f"**{spell['name']}**\n\nMax ({lvl}/{max_lvl}) ✨")
+                    else:
+                        st.info(f"**{spell['name']}**\n\nNiveau {lvl} / {max_lvl}\n*(Reste {remaining} niv.)*")
+        else:
+            st.info("Aucun sort trouvé.")
+
+    with tab_war:
+        st.subheader("Performances de Guerre")
+        st.write(f"**Attaques gagnées:** {data.get('attackWins', 0)}")
+        st.write(f"**Défenses gagnées:** {data.get('defenseWins', 0)}")
+        st.write(f"**Clan:** {data.get('clan', {}).get('name', 'Aucun clan')}")
