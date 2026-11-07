@@ -6,50 +6,28 @@ from datetime import datetime
 
 st.set_page_config(page_title="CoC Multi-Account Dashboard", layout="wide", page_icon="🛡️")
 
-# Initialisation du système de favoris dans la session state
+# Initialisation du système de favoris
 if "favorites" not in st.session_state:
     st.session_state.favorites = set()
 
-# Injection CSS pour des cartes uniformes, un fond vert max et un bouton favori discret dans la carte
+# CSS propre pour que la carte contienne parfaitement tous ses éléments
 st.markdown("""
 <style>
     .coc-card {
         background-color: #1e1e2e;
         border: 1px solid #313244;
         border-radius: 10px;
-        padding: 12px 15px;
-        margin-bottom: 10px;
-        height: 120px;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
+        padding: 15px;
+        margin-bottom: 15px;
+        min-height: 125px;
     }
     .coc-card-max {
         background-color: #064e3b !important;
         border: 2px solid #22c55e !important;
         border-radius: 10px;
-        padding: 12px 15px;
-        margin-bottom: 10px;
-        height: 120px;
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-    }
-    .card-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        width: 100%;
-    }
-    .card-title {
-        font-weight: bold;
-        font-size: 15px;
-        color: #cdd6f4;
-    }
-    .card-info {
-        font-size: 13px;
-        color: #bac2de;
-        margin-bottom: 4px;
+        padding: 15px;
+        margin-bottom: 15px;
+        min-height: 125px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -144,7 +122,6 @@ def get_icon_emoji(name):
     return "⚔️"
 
 def sort_by_favorites(items):
-    """Place les favoris en premier, puis le reste dans l'ordre initial"""
     favs = [i for i in items if i.get('name') in st.session_state.favorites]
     others = [i for i in items if i.get('name') not in st.session_state.favorites]
     return favs + others
@@ -160,22 +137,24 @@ def render_card(name, lvl, max_lvl, icon="⚔️"):
     is_fav = name in st.session_state.favorites
     fav_icon = "⭐" if is_fav else "☆"
     
-    # Structure de la carte avec bouton favori intégré proprement
+    # Conteneur global de la carte
     st.markdown(f'<div class="{card_class}">', unsafe_allow_html=True)
     
-    col_t, col_b = st.columns([0.8, 0.2])
-    with col_t:
-        st.markdown(f"<div class='card-title'>{icon} {name}</div>", unsafe_allow_html=True)
-    with col_b:
-        if st.button(fav_icon, key=f"fav_btn_{name}", help="Ajouter/Retirer des favoris"):
+    # Ligne du titre et du bouton favori intégré
+    c_title, c_btn = st.columns([0.8, 0.2])
+    with c_title:
+        st.markdown(f"**{icon} {name}**")
+    with c_btn:
+        if st.button(fav_icon, key=f"fav_btn_{name}", help="Favori"):
             if is_fav:
                 st.session_state.favorites.discard(name)
             else:
                 st.session_state.favorites.add(name)
             st.rerun()
             
-    st.markdown(f"<div class='card-info'>{status_text}</div>", unsafe_allow_html=True)
+    st.caption(status_text)
     st.progress(progress)
+    
     st.markdown('</div>', unsafe_allow_html=True)
 
 # -------------------------------------------------------------------
