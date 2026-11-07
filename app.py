@@ -425,7 +425,7 @@ else:
             st.info("Aucun sort trouvé.")
 
     # -------------------------------------------------------------------
-    # TAB 4: PARAMÉTRAGE DES COMPOSITIONS D'ATTAQUE (Avec icônes et sélection directe)
+    # TAB 4: PARAMÉTRAGE DES COMPOSITIONS D'ATTAQUE (Multiselect dynamique)
     # -------------------------------------------------------------------
     with tab_config:
         st.subheader("⚙️ Paramétrage des Compositions d'Attaque")
@@ -433,33 +433,38 @@ else:
         with st.form("composition_form"):
             comp_title = st.text_input("Nom de la composition (ex: Root Rider Spam)")
             
-            st.markdown("### 👑 Configuration des Héros (Familier & Équipements associés)")
+            st.markdown("### 👑 Sélection & Configuration des Héros (Max 4)")
             available_heroes = [h['name'] for h in data.get("heroes", []) if h.get("village") == "home"]
             available_eq = [e['name'] for e in data.get("heroEquipment", [])]
             
+            # Préparation des labels avec icônes pour le multiselect des héros
+            hero_labels = [f"{get_icon_emoji(h)} {h}" for h in available_heroes]
+            hero_map = {f"{get_icon_emoji(h)} {h}": h for h in available_heroes}
+            
+            selected_hero_labels = st.multiselect("Choisissez les héros à inclure", hero_labels)
+            selected_heroes_comp = [hero_map[l] for l in selected_hero_labels]
+            
             hero_custom_links = {}
-            for hero in available_heroes:
-                hero_icon = get_icon_emoji(hero)
-                st.markdown(f"**{hero_icon} {hero}**")
-                
-                col_cb, col_p, col_eq = st.columns([0.2, 0.4, 0.4])
-                with col_cb:
-                    include_hero = st.checkbox("Inclure", value=True, key=f"inc_{hero}")
-                with col_p:
-                    pet_options = ["Aucun"] + HERO_PETS_LIST
-                    pet_labels = [f"{get_icon_emoji(p)} {p}" if p != "Aucun" else "🚫 Aucun" for p in pet_options]
-                    selected_pet_idx = st.selectbox(f"Familier {hero}", range(len(pet_options)), format_func=lambda x: pet_labels[x], key=f"pet_{hero}")
-                    pet_choice = pet_options[selected_pet_idx]
-                with col_eq:
-                    eq_labels = [f"{get_icon_emoji(e)} {e}" for e in available_eq]
-                    # Map pour retrouver le nom original depuis l'affichage formaté
-                    eq_map = {f"{get_icon_emoji(e)} {e}": e for e in available_eq}
-                    selected_eq_labels = st.multiselect(f"Équipements {hero} (max 2)", eq_labels, key=f"eq_{hero}")
-                    eq_choices = [eq_map[label] for label in selected_eq_labels]
-                
-                if include_hero:
+            if selected_heroes_comp:
+                st.markdown("---")
+                for hero in selected_heroes_comp:
+                    hero_icon = get_icon_emoji(hero)
+                    st.markdown(f"**{hero_icon} Configuration pour {hero}**")
+                    
+                    col_p, col_eq = st.columns(2)
+                    with col_p:
+                        pet_options = ["Aucun"] + HERO_PETS_LIST
+                        pet_labels = [f"{get_icon_emoji(p)} {p}" if p != "Aucun" else "🚫 Aucun" for p in pet_options]
+                        selected_pet_idx = st.selectbox(f"Familier", range(len(pet_options)), format_func=lambda x: pet_labels[x], key=f"pet_{hero}")
+                        pet_choice = pet_options[selected_pet_idx]
+                    with col_eq:
+                        eq_labels = [f"{get_icon_emoji(e)} {e}" for e in available_eq]
+                        eq_map = {f"{get_icon_emoji(e)} {e}": e for e in available_eq}
+                        selected_eq_labels = st.multiselect(f"Équipements (max 2)", eq_labels, key=f"eq_{hero}")
+                        eq_choices = [eq_map[label] for label in selected_eq_labels]
+                    
                     hero_custom_links[hero] = {"pet": pet_choice, "equipment": eq_choices}
-                st.divider()
+                    st.divider()
 
             st.markdown("### 🧪 Troupes & Sorts de la Compo")
             available_troops = [t['name'] for t in raw_troops if not should_exclude(t.get("name", ""))]
