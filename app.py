@@ -6,6 +6,19 @@ from datetime import datetime
 
 st.set_page_config(page_title="CoC Multi-Account Dashboard", layout="wide", page_icon="🛡️")
 
+# Injection CSS pour harmoniser les hauteurs de cartes et colorer les barres max en vert
+st.markdown("""
+<style>
+    /* Uniformise la hauteur minimale des conteneurs (cartes) */
+    [data-testid="stVerticalBlockBorderWrapper"] {
+        min-height: 140px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # -------------------------------------------------------------------
 # 1. DATABASE & API SETUP
 # -------------------------------------------------------------------
@@ -60,7 +73,6 @@ HERO_PETS_LIST = [
     "Spirit Fox", "Angry Jelly", "Furnace"
 ]
 
-# Dictionnaire d'icônes par défaut ou émojis stylisés pour garantir un affichage propre et rapide
 def get_icon_emoji(name):
     n = name.lower()
     if "dragon" in n: return "🐉"
@@ -150,8 +162,13 @@ else:
                         lvl = hero.get("level")
                         max_lvl = hero.get("maxLevel")
                         progress = min(lvl / max_lvl, 1.0) if max_lvl > 0 else 0
-                        st.markdown(f"### 👑 {hero['name']}")
-                        st.metric("Niveau", f"{lvl} / {max_lvl}")
+                        remaining = max_lvl - lvl
+                        
+                        st.markdown(f"**👑 {hero['name']}**")
+                        if remaining == 0:
+                            st.caption(f"Niv. {lvl} / {max_lvl} — **Max ✨**")
+                        else:
+                            st.caption(f"Niv. {lvl} / {max_lvl} *(Reste {remaining})*")
                         st.progress(progress)
         else:
             st.info("Aucun héros trouvé.")
@@ -174,7 +191,7 @@ else:
                     with st.container(border=True):
                         st.markdown(f"**{icon} {pet['name']}**")
                         if remaining == 0:
-                            st.success(f"Max ({lvl}/{max_lvl}) ✨")
+                            st.caption(f"Niv. {lvl} / {max_lvl} — **Max ✨**")
                         else:
                             st.caption(f"Niv. {lvl} / {max_lvl} *(Reste {remaining})*")
                         st.progress(progress)
@@ -190,11 +207,15 @@ else:
                 lvl = eq.get("level")
                 max_lvl = eq.get("maxLevel")
                 progress = min(lvl / max_lvl, 1.0) if max_lvl > 0 else 0
+                remaining = max_lvl - lvl
                 
                 with col:
                     with st.container(border=True):
                         st.markdown(f"**🔮 {eq['name']}**")
-                        st.caption(f"Niv. {lvl} / {max_lvl}")
+                        if remaining == 0:
+                            st.caption(f"Niv. {lvl} / {max_lvl} — **Max ✨**")
+                        else:
+                            st.caption(f"Niv. {lvl} / {max_lvl} *(Reste {remaining})*")
                         st.progress(progress)
         else:
             st.info("Aucun équipement trouvé.")
@@ -225,7 +246,7 @@ else:
                     with st.container(border=True):
                         st.markdown(f"**{icon} {troop['name']}**")
                         if remaining == 0:
-                            st.success(f"Max ({lvl}/{max_lvl}) ✨")
+                            st.caption(f"Niv. {lvl} / {max_lvl} — **Max ✨**")
                         else:
                             st.caption(f"Niv. {lvl} / {max_lvl} *(Reste {remaining})*")
                         st.progress(progress)
@@ -248,7 +269,7 @@ else:
                     with st.container(border=True):
                         st.markdown(f"**🧪 {spell['name']}**")
                         if remaining == 0:
-                            st.success(f"Max ({lvl}/{max_lvl}) ✨")
+                            st.caption(f"Niv. {lvl} / {max_lvl} — **Max ✨**")
                         else:
                             st.caption(f"Niv. {lvl} / {max_lvl} *(Reste {remaining})*")
                         st.progress(progress)
