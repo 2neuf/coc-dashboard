@@ -11,8 +11,8 @@ st.set_page_config(page_title="CoC Multi-Account Dashboard", layout="wide", page
 def get_db_client():
     url = st.secrets["TURSO_DATABASE_URL"]
     auth_token = st.secrets["TURSO_AUTH_TOKEN"]
-    # Establish connection to Turso DB
-    conn = libsql.connect(url, sync_url=url, auth_token=auth_token)
+    # Utilisation de create_client_sync pour le client synchrone libsql-client
+    conn = libsql_client.create_client_sync(url=url, auth_token=auth_token)
     return conn
 
 def init_db():
