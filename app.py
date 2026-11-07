@@ -10,7 +10,7 @@ st.set_page_config(page_title="CoC Multi-Account Dashboard", layout="wide", page
 if "favorites" not in st.session_state:
     st.session_state.favorites = set()
 
-# CSS pour uniformiser les cartes et styliser proprement le texte max
+# CSS pour uniformiser les cartes et styliser les barres de progression personnalisées
 st.markdown("""
 <style>
     /* Hauteur et dimensions strictes et égales pour toutes les cartes */
@@ -29,6 +29,28 @@ st.markdown("""
     .max-title {
         color: #22c55e !important;
         font-weight: bold;
+    }
+
+    /* Conteneur de la barre de progression custom */
+    .custom-progress-bg {
+        background-color: #313244;
+        border-radius: 4px;
+        height: 8px;
+        width: 100%;
+        margin-top: 6px;
+        overflow: hidden;
+    }
+    /* Remplissage bleu (normal) */
+    .custom-progress-fill-blue {
+        background-color: #3b82f6;
+        height: 100%;
+        border-radius: 4px;
+    }
+    /* Remplissage vert (max) */
+    .custom-progress-fill-green {
+        background-color: #22c55e;
+        height: 100%;
+        border-radius: 4px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -130,7 +152,7 @@ def sort_by_favorites(items):
 def render_card(name, lvl, max_lvl, icon="⚔️"):
     remaining = max_lvl - lvl
     is_max = (remaining == 0)
-    progress = min(lvl / max_lvl, 1.0) if max_lvl > 0 else 0
+    progress_pct = int(min(lvl / max_lvl, 1.0) * 100) if max_lvl > 0 else 0
     
     status_text = "Niv. MAX ✨" if is_max else f"Niv. {lvl} / {max_lvl} *(Reste {remaining})*"
     is_fav = name in st.session_state.favorites
@@ -156,7 +178,14 @@ def render_card(name, lvl, max_lvl, icon="⚔️"):
         else:
             st.caption(status_text)
             
-        st.progress(progress)
+        # Barre de progression HTML custom (verte si max, bleue sinon)
+        fill_class = "custom-progress-fill-green" if is_max else "custom-progress-fill-blue"
+        bar_html = f"""
+        <div class="custom-progress-bg">
+            <div class="{fill_class}" style="width: {progress_pct}%;"></div>
+        </div>
+        """
+        st.markdown(bar_html, unsafe_allow_html=True)
 
 # -------------------------------------------------------------------
 # 2. APP LAYOUT
