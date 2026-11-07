@@ -6,16 +6,41 @@ from datetime import datetime
 
 st.set_page_config(page_title="CoC Multi-Account Dashboard", layout="wide", page_icon="🛡️")
 
-# Injection CSS pour styliser proprement les cartes Max sans casser la grille
+# Injection CSS pour des cartes uniformes et un vrai fond vert stylisé quand c'est max
 st.markdown("""
 <style>
-    /* Style pour les cartes au niveau max (fond vert foncé et bordure verte visible) */
-    .max-card {
-        background-color: rgba(20, 83, 45, 0.4) !important;
+    .coc-card {
+        background-color: #1e1e2e;
+        border: 1px solid #313244;
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 15px;
+        height: 110px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    .coc-card-max {
+        background-color: #064e3b !important;
         border: 2px solid #22c55e !important;
-        border-radius: 8px;
-        padding: 12px;
-        margin: -10px;
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 15px;
+        height: 110px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    .card-title {
+        font-weight: bold;
+        font-size: 16px;
+        color: #cdd6f4;
+        margin-bottom: 2px;
+    }
+    .card-info {
+        font-size: 13px;
+        color: #bac2de;
+        margin-bottom: 8px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -109,6 +134,23 @@ def get_icon_emoji(name):
     if "jelly" in n: return "🪼"
     return "⚔️"
 
+def render_card(name, lvl, max_lvl, icon="⚔️"):
+    remaining = max_lvl - lvl
+    is_max = (remaining == 0)
+    progress = min(lvl / max_lvl, 1.0) if max_lvl > 0 else 0
+    
+    card_class = "coc-card-max" if is_max else "coc-card"
+    status_text = "Niv. MAX ✨" if is_max else f"Niv. {lvl} / {max_lvl} *(Reste {remaining})*"
+    
+    html_code = f"""
+    <div class="{card_class}">
+        <div class="card-title">{icon} {name}</div>
+        <div class="card-info">{status_text}</div>
+    </div>
+    """
+    st.markdown(html_code, unsafe_allow_html=True)
+    st.progress(progress)
+
 # -------------------------------------------------------------------
 # 2. APP LAYOUT
 # -------------------------------------------------------------------
@@ -139,7 +181,6 @@ else:
     except Exception as e:
         st.warning(f"Could not update Turso DB: {e}")
 
-    # Header du profil
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Player Name", data.get("name"))
     col2.metric("Town Hall Level", f"TH {data.get('townHallLevel')}")
@@ -148,7 +189,6 @@ else:
 
     st.divider()
 
-    # Onglets principaux
     tab_army, tab_troops, tab_war = st.tabs(["⚔️ Héros, Familiers & Équipements", "🧪 Troupes & Sorts", "🛡️ War & Profil"])
 
     with tab_army:
@@ -159,25 +199,7 @@ else:
             hero_cols = st.columns(len(home_heroes))
             for idx, hero in enumerate(home_heroes):
                 with hero_cols[idx]:
-                    lvl = hero.get("level")
-                    max_lvl = hero.get("maxLevel")
-                    progress = min(lvl / max_lvl, 1.0) if max_lvl > 0 else 0
-                    remaining = max_lvl - lvl
-                    is_max = (remaining == 0)
-                    
-                    with st.container(border=True):
-                        if is_max:
-                            st.markdown('<div class="max-card">', unsafe_allow_html=True)
-                            
-                        st.markdown(f"**👑 {hero['name']}**")
-                        if is_max:
-                            st.caption(f"Niv. {lvl} / {max_lvl} — **MAX ✨**")
-                        else:
-                            st.caption(f"Niv. {lvl} / {max_lvl} *(Reste {remaining})*")
-                        st.progress(progress)
-                        
-                        if is_max:
-                            st.markdown('</div>', unsafe_allow_html=True)
+                    render_card(hero['name'], hero.get("level"), hero.get("maxLevel"), "👑")
         else:
             st.info("Aucun héros trouvé.")
                 
@@ -189,27 +211,8 @@ else:
             pet_cols = st.columns(4)
             for idx, pet in enumerate(pets):
                 col = pet_cols[idx % 4]
-                lvl = pet.get("level")
-                max_lvl = pet.get("maxLevel")
-                remaining = max_lvl - lvl
-                progress = min(lvl / max_lvl, 1.0) if max_lvl > 0 else 0
-                icon = get_icon_emoji(pet['name'])
-                is_max = (remaining == 0)
-                
                 with col:
-                    with st.container(border=True):
-                        if is_max:
-                            st.markdown('<div class="max-card">', unsafe_allow_html=True)
-                            
-                        st.markdown(f"**{icon} {pet['name']}**")
-                        if is_max:
-                            st.caption(f"Niv. {lvl} / {max_lvl} — **MAX ✨**")
-                        else:
-                            st.caption(f"Niv. {lvl} / {max_lvl} *(Reste {remaining})*")
-                        st.progress(progress)
-                        
-                        if is_max:
-                            st.markdown('</div>', unsafe_allow_html=True)
+                    render_card(pet['name'], pet.get("level"), pet.get("maxLevel"), get_icon_emoji(pet['name']))
         else:
             st.info("Aucun familier trouvé.")
 
@@ -219,26 +222,8 @@ else:
             eq_cols = st.columns(4)
             for idx, eq in enumerate(equipment):
                 col = eq_cols[idx % 4]
-                lvl = eq.get("level")
-                max_lvl = eq.get("maxLevel")
-                progress = min(lvl / max_lvl, 1.0) if max_lvl > 0 else 0
-                remaining = max_lvl - lvl
-                is_max = (remaining == 0)
-                
                 with col:
-                    with st.container(border=True):
-                        if is_max:
-                            st.markdown('<div class="max-card">', unsafe_allow_html=True)
-                            
-                        st.markdown(f"**🔮 {eq['name']}**")
-                        if is_max:
-                            st.caption(f"Niv. {lvl} / {max_lvl} — **MAX ✨**")
-                        else:
-                            st.caption(f"Niv. {lvl} / {max_lvl} *(Reste {remaining})*")
-                        st.progress(progress)
-                        
-                        if is_max:
-                            st.markdown('</div>', unsafe_allow_html=True)
+                    render_card(eq['name'], eq.get("level"), eq.get("maxLevel"), "🔮")
         else:
             st.info("Aucun équipement trouvé.")
 
@@ -258,27 +243,8 @@ else:
             cols = st.columns(4)
             for idx, troop in enumerate(troops):
                 col = cols[idx % 4]
-                lvl = troop.get("level")
-                max_lvl = troop.get("maxLevel")
-                remaining = max_lvl - lvl
-                progress = min(lvl / max_lvl, 1.0) if max_lvl > 0 else 0
-                icon = get_icon_emoji(troop['name'])
-                is_max = (remaining == 0)
-                
                 with col:
-                    with st.container(border=True):
-                        if is_max:
-                            st.markdown('<div class="max-card">', unsafe_allow_html=True)
-                            
-                        st.markdown(f"**{icon} {troop['name']}**")
-                        if is_max:
-                            st.caption(f"Niv. {lvl} / {max_lvl} — **MAX ✨**")
-                        else:
-                            st.caption(f"Niv. {lvl} / {max_lvl} *(Reste {remaining})*")
-                        st.progress(progress)
-                        
-                        if is_max:
-                            st.markdown('</div>', unsafe_allow_html=True)
+                    render_card(troop['name'], troop.get("level"), troop.get("maxLevel"), get_icon_emoji(troop['name']))
         else:
             st.info("Aucune troupe trouvée.")
 
@@ -289,26 +255,8 @@ else:
             spell_cols = st.columns(4)
             for idx, spell in enumerate(spells):
                 col = spell_cols[idx % 4]
-                lvl = spell.get("level")
-                max_lvl = spell.get("maxLevel")
-                remaining = max_lvl - lvl
-                progress = min(lvl / max_lvl, 1.0) if max_lvl > 0 else 0
-                is_max = (remaining == 0)
-                
                 with col:
-                    with st.container(border=True):
-                        if is_max:
-                            st.markdown('<div class="max-card">', unsafe_allow_html=True)
-                            
-                        st.markdown(f"**🧪 {spell['name']}**")
-                        if is_max:
-                            st.caption(f"Niv. {lvl} / {max_lvl} — **MAX ✨**")
-                        else:
-                            st.caption(f"Niv. {lvl} / {max_lvl} *(Reste {remaining})*")
-                        st.progress(progress)
-                        
-                        if is_max:
-                            st.markdown('</div>', unsafe_allow_html=True)
+                    render_card(spell['name'], spell.get("level"), spell.get("maxLevel"), "🧪")
         else:
             st.info("Aucun sort trouvé.")
 
