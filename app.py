@@ -10,12 +10,15 @@ st.set_page_config(page_title="CoC Multi-Account Dashboard", layout="wide", page
 if "favorites" not in st.session_state:
     st.session_state.favorites = set()
 
-# CSS pour colorer les barres de progression en vert lorsque l'élément est max
+# CSS pour unifier les cartes et colorer la jauge de progression en vert pour les éléments max
 st.markdown("""
 <style>
-    /* Cible les barres de progression dans les conteneurs max pour les passer en vert */
-    div.row-widget.stProgress div[data-baseweb="progress-bar"] > div {
-        background-color: #3b82f6; /* Bleu par défaut */
+    /* Style par défaut des cartes */
+    [data-testid="stVerticalBlockBorderWrapper"] {
+        background-color: #1e1e2e;
+        border-radius: 10px;
+        border: 1px solid #313244;
+        padding: 5px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -140,7 +143,7 @@ def render_card(name, lvl, max_lvl, icon="⚔️"):
         else:
             st.caption(status_text)
             
-        # Astuce propre : pour colorer la jauge en vert si max, on injecte un style spécifique ou on utilise le rendu natif
+        # Injection ciblée pour basculer la jauge en vert si l'élément est max
         if is_max:
             st.markdown("""
                 <style>
@@ -207,7 +210,7 @@ else:
                 
         st.subheader("🐾 Familiers de Héros (Pets)")
         raw_troops_for_pets = data.get("troops", [])
-        pets = [t for t in raw_troops_for_pets if t.get("name"] in HERO_PETS_LIST]
+        pets = [t for t in raw_troops_for_pets if t.get("name") in HERO_PETS_LIST]
         sorted_pets = sort_by_favorites(pets)
         
         if sorted_pets:
