@@ -52,8 +52,14 @@ def init_db():
     """)
 
 def fetch_player_data(player_tag: str):
-    formatted_tag = player_tag.strip().replace("#", "%23")
+    # Nettoyage strict des espaces invisibles
+    clean_tag = player_tag.strip()
+    formatted_tag = clean_tag.replace("#", "%23")
     url = f"https://api.clashofclans.com/v1/players/{formatted_tag}"
+    
+    # Affichage de débogage dans l'app Streamlit
+    st.write(f"🔍 URL appelée : `{url}`")
+    
     headers = {
         "Authorization": f"Bearer {st.secrets['COC_API_TOKEN']}",
         "Accept": "application/json"
