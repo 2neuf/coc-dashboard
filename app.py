@@ -12,7 +12,11 @@ st.set_page_config(page_title="CoC Multi-Account Dashboard", layout="wide", page
 def get_db_client():
     url = st.secrets["TURSO_DATABASE_URL"]
     auth_token = st.secrets["TURSO_AUTH_TOKEN"]
-    # Utilisation de create_client_sync pour le client synchrone libsql-client
+    
+    # Conversion de libsql:// en https:// pour forcer le transport HTTP stable
+    if url.startswith("libsql://"):
+        url = url.replace("libsql://", "https://")
+        
     conn = libsql_client.create_client_sync(url=url, auth_token=auth_token)
     return conn
 
