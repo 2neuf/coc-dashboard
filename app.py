@@ -159,7 +159,8 @@ def render_card(name, lvl, max_lvl, icon="⚔️"):
     fav_icon = "⭐" if is_fav else "☆"
     
     with st.container(border=True):
-        col_t, col_btn = st.columns([0.8, 0.2])
+        # Répartition des colonnes ajustée à [0.75, 0.25] pour laisser respirer l'icône de favori
+        col_t, col_btn = st.columns([0.75, 0.25])
         with col_t:
             if is_max:
                 st.markdown(f'<span class="max-title">{icon} {name}</span>', unsafe_allow_html=True)
