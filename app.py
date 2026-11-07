@@ -86,6 +86,14 @@ def init_db():
             details TEXT
         )
     """)
+    # Table pour lier dynamiquement les équipements aux héros par l'utilisateur
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS hero_equipment_config (
+            hero_name TEXT,
+            equipment_name TEXT,
+            PRIMARY KEY (hero_name, equipment_name)
+        )
+    """)
     
     conn.execute("""
         INSERT OR IGNORE INTO accounts (player_tag, name, town_hall, active_composition) 
@@ -146,31 +154,6 @@ SIEGE_MACHINES_LIST = [
     "Wall Wreck", "Battle Blimp", "Stone Slammer", 
     "Siege Barracks", "Log Launcher", "Flame Flinger", "Battle Drill"
 ]
-
-# Dictionnaire complet et officiel des équipements par Héros
-HERO_EQUIPMENT_MAPPING = {
-    "Barbarian King": [
-        "Giant Gauntlet", "Barbarian Puppet", "Earthquake Boots", 
-        "Rage Vial", "Vambrace", "Spiky Ball"
-    ],
-    "Archer Queen": [
-        "Giant Arrow", "Archer Puppet", "Invisibility Vial", 
-        "Healer Puppet", "Magic Mirror", "Frozen Arrow"
-    ],
-    "Grand Warden": [
-        "Life Gem", "Eternal Tome", "Healing Tome", "Fireball", "Lavaloon Puppet"
-    ],
-    "Royal Champion": [
-        "Seeking Shield", "Hog Rider Puppet", "Haste Vial", 
-        "Royal Gem", "Rocket Spear", "Electro Boots"
-    ],
-    "Minion Prince": [
-        "Protector Puppet", "Henchman Pants", "Dark Orb", "Meteor Staff", "Dark Crown"
-    ],
-    "Dragon Duke": [
-        "Fire Heart", "Blowtorch", "Electro Fang", "Jetpack", "Card Deck"
-    ]
-}
 
 def get_icon_emoji(name):
     n = name.lower()
@@ -450,20 +433,51 @@ else:
             st.info("Aucun sort trouvé.")
 
     # -------------------------------------------------------------------
-    # TAB 4: PARAMÉTRAGE DES COMPOSITIONS D'ATTAQUE
+    # TAB 4: PARAMÉTRAGE DES COMPOSITIONS D'ATTAQUE ET CLASSEMENT ÉQUIPEMENTS
     # -------------------------------------------------------------------
     with tab_config:
+        st.subheader("🛠️ Gestion dynamique : Associer les Équipements aux Héros")
+        st.markdown("Utilisez cet espace pour lier manuellement vos équipements à chaque héros de votre choix.")
+        
+        conn_db = get_db_client()
+        available_heroes = [h.get('name') for h in data.get("heroes", []) if h.get("village"] == "home"]
+        all_player_eqs = [e.get('name') for e in data.get("heroEquipment", [])]
+        
+        if available_heroes and all_player_eqs:
+            with st.form("mapping_form"):
+                selected_hero_to_map = st.selectbox("Sélectionner un héros", available_heroes)
+                
+                # Récupérer les équipements déjà liés dans la base pour ce héros
+                res_linked = conn_db.execute("SELECT equipment_name FROM hero_equipment_config WHERE hero_name = ?", [selected_hero_to_map])
+                already_linked_eqs = [row[0] for row in res_linked.rows]
+                
+                eq_labels = [f"{get_icon_emoji(eq)} {eq}" for eq in all_player_eqs]
+                eq_map = {f"{get_icon_emoji(eq)} {eq}": eq for eq in all_player_eqs}
+                default_selection = [f"{get_icon_emoji(eq)} {eq}" for eq in already_linked_eqs if eq in all_player_eqs]
+                
+                selected_mapped_labels = st.multiselect("Cocher les équipements de ce héros", eq_labels, default=default_selection)
+                
+                submitted_mapping = st.form_submit_button("Sauvegarder l'association des équipements")
+                if submitted_mapping:
+                    # Supprimer les anciennes associations pour ce héros et insérer les nouvelles
+                    conn_db.execute("DELETE FROM hero_equipment_config WHERE hero_name = ?", [selected_hero_to_map])
+                    for label in selected_mapped_labels:
+                        eq_name = eq_map[label]
+                        conn_db.execute("INSERT INTO hero_equipment_config (hero_name, equipment_name) VALUES (?, ?)", [selected_hero_to_map, eq_name])
+                    st.success(f"Association enregistrée pour {selected_hero_to_map} !")
+                    st.rerun()
+        else:
+            st.info("Aucun héros ou équipement détecté par l'API pour ce joueur.")
+
+        st.divider()
         st.subheader("⚙️ Paramétrage des Compositions d'Attaque")
         
         comp_title = st.text_input("Nom de la composition (ex: Root Rider Spam)")
         
-        st.markdown("### 👑 Sélection des Héros")
-        available_heroes = [h.get('name') for h in data.get("heroes", []) if h.get("village") == "home"]
-            
         hero_labels = [f"{get_icon_emoji(h)} {h}" for h in available_heroes]
         hero_map = {f"{get_icon_emoji(h)} {h}": h for h in available_heroes}
         
-        selected_hero_labels = st.multiselect("Choisissez les héros à inclure", hero_labels, key="hero_multiselect")
+        selected_hero_labels = st.multiselect("Choisissez les héros à inclure dans la compo", hero_labels, key="hero_multiselect")
         selected_heroes_comp = [hero_map[l] for l in selected_hero_labels]
         
         hero_custom_links = {}
@@ -484,16 +498,22 @@ else:
                     pet_choice = pet_options[selected_pet_idx]
                 
                 with col_eq:
-                    hero_specific_eqs = HERO_EQUIPMENT_MAPPING.get(hero, [e.get('name') for e in data.get("heroEquipment", [])])
+                    # Récupérer les équipements liés à ce héros depuis la table de config dynamique
+                    res_cfg = conn_db.execute("SELECT equipment_name FROM hero_equipment_config WHERE hero_name = ?", [hero])
+                    hero_specific_eqs = [row[0] for row in res_cfg.rows]
                     
-                    eq_labels = [f"{get_icon_emoji(e)} {e}" for e in hero_specific_eqs]
-                    eq_map = {f"{get_icon_emoji(e)} {e}": e for e in hero_specific_eqs}
+                    # Fallback si rien n'a été configuré dans l'outil de mapping ci-dessus
+                    if not hero_specific_eqs:
+                        hero_specific_eqs = all_player_eqs
                     
-                    selected_eq_labels = st.multiselect(f"Équipements pour {hero} (max 2)", eq_labels, key=f"eq_{hero}")
-                    eq_choices = [eq_map[label] for label in selected_eq_labels]
+                    eq_labels_hero = [f"{get_icon_emoji(e)} {e}" for e in hero_specific_eqs]
+                    eq_map_hero = {f"{get_icon_emoji(e)} {e}": e for e in hero_specific_eqs}
+                    
+                    selected_eq_labels = st.multiselect(f"Équipements pour {hero} (max 2)", eq_labels_hero, key=f"eq_{hero}")
+                    eq_choices = [eq_map_hero[label] for label in selected_eq_labels]
                     
                     if not eq_choices:
-                        st.warning(f"⚠️ Veuillez joindre et sélectionner les équipements de **{hero}** (maximum 2).")
+                        st.warning(f"⚠️ Veuillez configurer et sélectionner les équipements de **{hero}** dans l'outil de gestion ci-dessus ou les cocher ici.")
                 
                 hero_custom_links[hero] = {"pet": pet_choice, "equipment": eq_choices}
                 st.divider()
