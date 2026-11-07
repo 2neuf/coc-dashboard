@@ -10,15 +10,30 @@ st.set_page_config(page_title="CoC Multi-Account Dashboard", layout="wide", page
 if "favorites" not in st.session_state:
     st.session_state.favorites = set()
 
-# CSS propre pour styliser proprement les conteneurs natifs de Streamlit
+# CSS personnalisé pour cibler proprement les cartes normales et les cartes max
 st.markdown("""
 <style>
-    /* Style par défaut des cartes */
-    [data-testid="stVerticalBlockBorderWrapper"] {
+    .card-normal {
         background-color: #1e1e2e;
-        border-radius: 10px;
         border: 1px solid #313244;
-        padding: 5px;
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 10px;
+        height: 120px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    .card-max {
+        background-color: #064e3b !important;
+        border: 2px solid #22c55e !important;
+        border-radius: 10px;
+        padding: 15px;
+        margin-bottom: 10px;
+        height: 120px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -126,25 +141,32 @@ def render_card(name, lvl, max_lvl, icon="⚔️"):
     is_fav = name in st.session_state.favorites
     fav_icon = "⭐" if is_fav else "☆"
     
-    # Utilisation d'un conteneur natif Streamlit avec bordure
-    with st.container(border=True):
-        col_t, col_btn = st.columns([0.8, 0.2])
-        with col_t:
-            st.markdown(f"**{icon} {name}**")
-        with col_btn:
-            if st.button(fav_icon, key=f"fav_btn_{name}", help="Favori"):
-                if is_fav:
-                    st.session_state.favorites.discard(name)
-                else:
-                    st.session_state.favorites.add(name)
-                st.rerun()
-                
-        if is_max:
-            st.markdown(f":green[**{status_text}**]")
+    css_class = "card-max" if is_max else "card-normal"
+    
+    # Rendu propre de la carte avec le fond coloré selon l'état
+    st.markdown(f'''
+        <div class="{css_class}">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-weight: bold; color: #cdd6f4;">{icon} {name}</span>
+    ''', unsafe_allow_html=True)
+    
+    # Bouton favori discret géré via Streamlit
+    if st.button(fav_icon, key=f"fav_btn_{name}", help="Favori"):
+        if is_fav:
+            st.session_state.favorites.discard(name)
         else:
-            st.caption(status_text)
-            
-        st.progress(progress)
+            st.session_state.favorites.add(name)
+        st.rerun()
+        
+    st.markdown(f'''
+            </div>
+            <div style="font-size: 13px; color: {"#86efac" if is_max else "#bac2de"}; font-weight: {"bold" if is_max else "normal"};">
+                {status_text}
+            </div>
+        </div>
+    ''', unsafe_allow_html=True)
+    
+    st.progress(progress)
 
 # -------------------------------------------------------------------
 # 2. APP LAYOUT
