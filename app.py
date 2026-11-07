@@ -52,13 +52,16 @@ def init_db():
     """)
 
 def fetch_player_data(player_tag: str):
-    # Nettoyage strict des espaces invisibles
-    clean_tag = player_tag.strip()
-    formatted_tag = clean_tag.replace("#", "%23")
-    url = f"https://api.clashofclans.com/v1/players/{formatted_tag}"
+    # Nettoyage rigoureux : enlève les espaces et force les majuscules
+    clean_tag = player_tag.strip().upper()
     
-    # Affichage de débogage dans l'app Streamlit
-    st.write(f"🔍 URL appelée : `{url}`")
+    # S'assure que le tag commence bien par un #
+    if not clean_tag.startswith("#"):
+        clean_tag = "#" + clean_tag
+        
+    # Encodage sécurisé de l'URL pour l'API Supercell
+    encoded_tag = urllib.parse.quote(clean_tag, safe='')
+    url = f"https://api.clashofclans.com/v1/players/{encoded_tag}"
     
     headers = {
         "Authorization": f"Bearer {st.secrets['COC_API_TOKEN']}",
