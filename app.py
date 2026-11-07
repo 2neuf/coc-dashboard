@@ -65,7 +65,6 @@ def get_db_client():
 
 def init_db():
     conn = get_db_client()
-    # Table des comptes
     conn.execute("""
         CREATE TABLE IF NOT EXISTS accounts (
             player_tag TEXT PRIMARY KEY,
@@ -74,13 +73,11 @@ def init_db():
             gold_pass_boost INTEGER DEFAULT 0
         )
     """)
-    # Migration sécurisée pour ajouter la colonne active_composition si elle n'existe pas
     try:
         conn.execute("ALTER TABLE accounts ADD COLUMN active_composition TEXT DEFAULT 'Aucune'")
     except Exception:
         pass
 
-    # Table des favoris
     conn.execute("""
         CREATE TABLE IF NOT EXISTS favorites (
             player_tag TEXT,
@@ -88,7 +85,6 @@ def init_db():
             PRIMARY KEY (player_tag, item_name)
         )
     """)
-    # Table des compositions d'attaque personnalisées
     conn.execute("""
         CREATE TABLE IF NOT EXISTS compositions (
             comp_name TEXT PRIMARY KEY,
@@ -96,7 +92,6 @@ def init_db():
         )
     """)
     
-    # Insertion de test pour "Mini"
     conn.execute("""
         INSERT OR IGNORE INTO accounts (player_tag, name, town_hall, active_composition) 
         VALUES (?, ?, ?, ?)
@@ -261,7 +256,6 @@ try:
 except Exception as e:
     st.sidebar.error(f"❌ DB Error: {e}")
 
-# Sélection du compte actif dans la sidebar
 accounts_list = get_all_accounts()
 account_options = {row[1]: row[0] for row in accounts_list}
 
@@ -289,7 +283,6 @@ else:
     except Exception as e:
         st.warning(f"Could not update Turso DB: {e}")
 
-    # Onglets principaux (sans l'onglet War & Profil)
     tab_overview, tab_army, tab_troops, tab_config = st.tabs([
         "📊 Vue d'ensemble", 
         "⚔️ Héros, Familiers & Équipements", 
@@ -433,7 +426,7 @@ else:
             st.info("Aucun sort trouvé.")
 
     # -------------------------------------------------------------------
-    # TAB 4: PARAMÉTRAGE DES COMPOSITIONS D'ATTAQUE
+    # TAB 4: PARAMÉTRAGE DES COMPOSITIONS D'ATTAQUE (Liaison Héros -> Familier + 2 Équipements)
     # -------------------------------------------------------------------
     with tab_config:
         st.subheader("⚙️ Paramétrage des Compositions d'Attaque")
@@ -441,15 +434,24 @@ else:
         with st.form("composition_form"):
             comp_title = st.text_input("Nom de la composition (ex: Root Rider Spam)")
             
-            st.markdown("### Sélection des Éléments de la Compo")
+            st.markdown("### 👑 Configuration liée des Héros (Familier & 2 Équipements par Héros)")
             available_heroes = [h['name'] for h in data.get("heroes", []) if h.get("village") == "home"]
-            selected_heroes_comp = st.multiselect("Sélectionner les Héros", available_heroes)
+            selected_heroes_comp = st.multiselect("Sélectionner les Héros de la composition", available_heroes)
             
-            selected_pets_comp = st.multiselect("Sélectionner les Familiers", HERO_PETS_LIST)
-            
+            hero_custom_links = {}
             available_eq = [e['name'] for e in data.get("heroEquipment", [])]
-            selected_eq_comp = st.multiselect("Sélectionner les Équipements", available_eq)
-            
+
+            for hero in selected_heroes_comp:
+                st.markdown(f"**🔗 Configuration pour : {hero}**")
+                col_h1, col_h2 = st.columns(2)
+                with col_h1:
+                    pet_choice = st.selectbox(f"Familier pour {hero}", ["Aucun"] + HERO_PETS_LIST, key=f"pet_{hero}")
+                with col_h2:
+                    eq_choices = st.multiselect(f"2 Équipements pour {hero} (max 2)", available_eq, max_selected_values=2, key=f"eq_{hero}")
+                hero_custom_links[hero] = {"pet": pet_choice, "equipment": eq_choices}
+                st.divider()
+
+            st.markdown("### 🧪 Troupes & Sorts de la Compo")
             available_troops = [t['name'] for t in raw_troops if not should_exclude(t.get("name", ""))]
             selected_troops_comp = st.multiselect("Sélectionner les Troupes", available_troops)
             
@@ -458,7 +460,16 @@ else:
             
             submitted = st.form_submit_button("Enregistrer la composition")
             if submitted and comp_title:
-                comp_details = f"Héros: {', '.join(selected_heroes_comp)} | Familiers: {', '.join(selected_pets_comp)} | Équipements: {', '.join(selected_eq_comp)} | Troupes: {', '.join(selected_troops_comp)} | Sorts: {', '.join(selected_spells_comp)}"
+                # Construction d'un résumé textuel structuré pour la vue d'ensemble et la DB
+                heroes_summary_list = []
+                for h, config in hero_custom_links.items():
+                    pets_str = f"Pet: {config['pet']}" if config['pet'] != "Aucun" else ""
+                    eq_str = f"Équipements: {', '.join(config['equipment'])}" if config['equipment'] else ""
+                    details_h = f"{h} ({pets_str} | {eq_str})"
+                    heroes_summary_list.append(details_h)
+
+                comp_details = f"Héros -> {' / '.join(heroes_summary_list)} | Troupes: {', '.join(selected_troops_comp)} | Sorts: {', '.join(selected_spells_comp)}"
+                
                 conn = get_db_client()
                 conn.execute("INSERT OR REPLACE INTO compositions (comp_name, details) VALUES (?, ?)", [comp_title, comp_details])
                 st.success(f"Composition '{comp_title}' enregistrée avec succès !")
