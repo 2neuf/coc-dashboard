@@ -6,6 +6,10 @@ from datetime import datetime
 
 st.set_page_config(page_title="CoC Multi-Account Dashboard", layout="wide", page_icon="🛡️")
 
+# Initialisation du système de favoris dans la session state
+if "favorites" not in st.session_state:
+    st.session_state.favorites = set()
+
 # Injection CSS pour des cartes uniformes et un vrai fond vert stylisé quand c'est max
 st.markdown("""
 <style>
@@ -13,9 +17,9 @@ st.markdown("""
         background-color: #1e1e2e;
         border: 1px solid #313244;
         border-radius: 10px;
-        padding: 15px;
-        margin-bottom: 15px;
-        height: 110px;
+        padding: 12px 15px;
+        margin-bottom: 10px;
+        height: 125px;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
@@ -24,23 +28,27 @@ st.markdown("""
         background-color: #064e3b !important;
         border: 2px solid #22c55e !important;
         border-radius: 10px;
-        padding: 15px;
-        margin-bottom: 15px;
-        height: 110px;
+        padding: 12px 15px;
+        margin-bottom: 10px;
+        height: 125px;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
     }
+    .card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
     .card-title {
         font-weight: bold;
-        font-size: 16px;
+        font-size: 15px;
         color: #cdd6f4;
-        margin-bottom: 2px;
     }
     .card-info {
         font-size: 13px;
         color: #bac2de;
-        margin-bottom: 8px;
+        margin-bottom: 4px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -134,6 +142,12 @@ def get_icon_emoji(name):
     if "jelly" in n: return "🪼"
     return "⚔️"
 
+def sort_by_favorites(items):
+    """Place les favoris en premier, puis le reste dans l'ordre initial"""
+    favs = [i for i in items if i.get('name') in st.session_state.favorites]
+    others = [i for i in items if i.get('name') not in st.session_state.favorites]
+    return favs + others
+
 def render_card(name, lvl, max_lvl, icon="⚔️"):
     remaining = max_lvl - lvl
     is_max = (remaining == 0)
@@ -142,14 +156,25 @@ def render_card(name, lvl, max_lvl, icon="⚔️"):
     card_class = "coc-card-max" if is_max else "coc-card"
     status_text = "Niv. MAX ✨" if is_max else f"Niv. {lvl} / {max_lvl} *(Reste {remaining})*"
     
-    html_code = f"""
-    <div class="{card_class}">
-        <div class="card-title">{icon} {name}</div>
-        <div class="card-info">{status_text}</div>
-    </div>
-    """
-    st.markdown(html_code, unsafe_allow_html=True)
+    is_fav = name in st.session_state.favorites
+    
+    # Checkbox pour gérer le favori directement sur la carte
+    col_title, col_fav = st.columns([0.8, 0.2])
+    with col_title:
+        st.markdown(f'<div class="{card_class}">'
+                    f'<div class="card-header"><span class="card-title">{icon} {name}</span></div>'
+                    f'<div class="card-info">{status_text}</div>', unsafe_allow_html=True)
+    with col_fav:
+        new_fav = st.checkbox("⭐", value=is_fav, key=f"fav_{name}", label_visibility="collapsed")
+        if new_fav != is_fav:
+            if new_fav:
+                st.session_state.favorites.add(name)
+            else:
+                st.session_state.favorites.discard(name)
+            st.rerun()
+
     st.progress(progress)
+    st.markdown('</div>', unsafe_allow_html=True)
 
 # -------------------------------------------------------------------
 # 2. APP LAYOUT
@@ -195,9 +220,10 @@ else:
         st.subheader("👑 Héros")
         heroes = data.get("heroes", [])
         home_heroes = [h for h in heroes if h.get("village") == "home"]
-        if home_heroes:
-            hero_cols = st.columns(len(home_heroes))
-            for idx, hero in enumerate(home_heroes):
+        sorted_heroes = sort_by_favorites(home_heroes)
+        if sorted_heroes:
+            hero_cols = st.columns(len(sorted_heroes))
+            for idx, hero in enumerate(sorted_heroes):
                 with hero_cols[idx]:
                     render_card(hero['name'], hero.get("level"), hero.get("maxLevel"), "👑")
         else:
@@ -206,10 +232,11 @@ else:
         st.subheader("🐾 Familiers de Héros (Pets)")
         raw_troops_for_pets = data.get("troops", [])
         pets = [t for t in raw_troops_for_pets if t.get("name") in HERO_PETS_LIST]
+        sorted_pets = sort_by_favorites(pets)
         
-        if pets:
+        if sorted_pets:
             pet_cols = st.columns(4)
-            for idx, pet in enumerate(pets):
+            for idx, pet in enumerate(sorted_pets):
                 col = pet_cols[idx % 4]
                 with col:
                     render_card(pet['name'], pet.get("level"), pet.get("maxLevel"), get_icon_emoji(pet['name']))
@@ -218,9 +245,10 @@ else:
 
         st.subheader("⚔️ Équipements de Héros")
         equipment = data.get("heroEquipment", [])
-        if equipment:
+        sorted_eq = sort_by_favorites(equipment)
+        if sorted_eq:
             eq_cols = st.columns(4)
-            for idx, eq in enumerate(equipment):
+            for idx, eq in enumerate(sorted_eq):
                 col = eq_cols[idx % 4]
                 with col:
                     render_card(eq['name'], eq.get("level"), eq.get("maxLevel"), "🔮")
@@ -238,10 +266,11 @@ else:
             return is_super or is_pet
         
         troops = [t for t in raw_troops if not should_exclude(t.get("name", ""))]
+        sorted_troops = sort_by_favorites(troops)
         
-        if troops:
+        if sorted_troops:
             cols = st.columns(4)
-            for idx, troop in enumerate(troops):
+            for idx, troop in enumerate(sorted_troops):
                 col = cols[idx % 4]
                 with col:
                     render_card(troop['name'], troop.get("level"), troop.get("maxLevel"), get_icon_emoji(troop['name']))
@@ -250,10 +279,11 @@ else:
 
         st.subheader("⚡ Progression des Sorts (Village Principal)")
         spells = [s for s in data.get("spells", []) if s.get("village") == "home"]
+        sorted_spells = sort_by_favorites(spells)
         
-        if spells:
+        if sorted_spells:
             spell_cols = st.columns(4)
-            for idx, spell in enumerate(spells):
+            for idx, spell in enumerate(sorted_spells):
                 col = spell_cols[idx % 4]
                 with col:
                     render_card(spell['name'], spell.get("level"), spell.get("maxLevel"), "🧪")
