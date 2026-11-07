@@ -378,7 +378,7 @@ else:
     # -------------------------------------------------------------------
     with tab_troops:
         st.subheader("🧪 Progression des Troupes (Village Principal)")
-        raw_troops = [t for t in data.get("troops", []) if t.get("village") == "home"]
+        raw_troops = [t for t in data.get("troops", []) if t.get("village"] == "home"]
         
         def should_exclude(name):
             name_lower = name.lower()
@@ -400,7 +400,7 @@ else:
             st.info("Aucune troupe trouvée.")
 
         st.subheader("🛒 Engins de Siège")
-        siege_machines = [t for t in raw_troops if t.get("name") in SIEGE_MACHINES_LIST]
+        siege_machines = [t for t in raw_troops if t.get("name"] in SIEGE_MACHINES_LIST]
         sorted_siege = sort_items(siege_machines, current_favorites)
         
         if sorted_siege:
@@ -426,7 +426,7 @@ else:
             st.info("Aucun sort trouvé.")
 
     # -------------------------------------------------------------------
-    # TAB 4: PARAMÉTRAGE DES COMPOSITIONS D'ATTAQUE (Liaison Héros -> Familier + 2 Équipements)
+    # TAB 4: PARAMÉTRAGE DES COMPOSITIONS D'ATTAQUE (Configuration directe par Héros)
     # -------------------------------------------------------------------
     with tab_config:
         st.subheader("⚙️ Paramétrage des Compositions d'Attaque")
@@ -434,21 +434,23 @@ else:
         with st.form("composition_form"):
             comp_title = st.text_input("Nom de la composition (ex: Root Rider Spam)")
             
-            st.markdown("### 👑 Configuration liée des Héros (Familier & 2 Équipements par Héros)")
+            st.markdown("### 👑 Configuration des Héros (Familier & 2 Équipements par Héros)")
             available_heroes = [h['name'] for h in data.get("heroes", []) if h.get("village") == "home"]
-            selected_heroes_comp = st.multiselect("Sélectionner les Héros de la composition", available_heroes)
+            available_eq = [e['name'] for e in data.get("heroEquipment", [])]
             
             hero_custom_links = {}
-            available_eq = [e['name'] for e in data.get("heroEquipment", [])]
-
-            for hero in selected_heroes_comp:
-                st.markdown(f"**🔗 Configuration pour : {hero}**")
-                col_h1, col_h2 = st.columns(2)
-                with col_h1:
-                    pet_choice = st.selectbox(f"Familier pour {hero}", ["Aucun"] + HERO_PETS_LIST, key=f"pet_{hero}")
-                with col_h2:
-                    eq_choices = st.multiselect(f"2 Équipements pour {hero} (max 2)", available_eq, max_selected_values=2, key=f"eq_{hero}")
-                hero_custom_links[hero] = {"pet": pet_choice, "equipment": eq_choices}
+            for hero in available_heroes:
+                st.markdown(f"**👑 {hero}**")
+                col_cb, col_p, col_eq = st.columns([0.2, 0.4, 0.4])
+                with col_cb:
+                    include_hero = st.checkbox(f"Inclure", value=True, key=f"inc_{hero}")
+                with col_p:
+                    pet_choice = st.selectbox(f"Familier", ["Aucun"] + HERO_PETS_LIST, key=f"pet_{hero}")
+                with col_eq:
+                    eq_choices = st.multiselect(f"2 Équipements (max 2)", available_eq, max_selected_values=2, key=f"eq_{hero}")
+                
+                if include_hero:
+                    hero_custom_links[hero] = {"pet": pet_choice, "equipment": eq_choices}
                 st.divider()
 
             st.markdown("### 🧪 Troupes & Sorts de la Compo")
@@ -460,13 +462,11 @@ else:
             
             submitted = st.form_submit_button("Enregistrer la composition")
             if submitted and comp_title:
-                # Construction d'un résumé textuel structuré pour la vue d'ensemble et la DB
                 heroes_summary_list = []
                 for h, config in hero_custom_links.items():
-                    pets_str = f"Pet: {config['pet']}" if config['pet'] != "Aucun" else ""
-                    eq_str = f"Équipements: {', '.join(config['equipment'])}" if config['equipment'] else ""
-                    details_h = f"{h} ({pets_str} | {eq_str})"
-                    heroes_summary_list.append(details_h)
+                    pets_str = f"Pet: {config['pet']}" if config['pet'] != "Aucun" else "Pet: Aucun"
+                    eq_str = f"Équipements: {', '.join(config['equipment'])}" if config['equipment'] else "Équipements: Aucun"
+                    heroes_summary_list.append(f"{h} ({pets_str} | {eq_str})")
 
                 comp_details = f"Héros -> {' / '.join(heroes_summary_list)} | Troupes: {', '.join(selected_troops_comp)} | Sorts: {', '.join(selected_spells_comp)}"
                 
