@@ -6,12 +6,16 @@ from datetime import datetime
 
 st.set_page_config(page_title="CoC Multi-Account Dashboard", layout="wide", page_icon="🛡️")
 
-# Styling global CSS léger et propre
+# Injection CSS pour styliser proprement les cartes Max sans casser la grille
 st.markdown("""
 <style>
-    /* Homogénéité visuelle pour les cartes */
-    [data-testid="stVerticalBlockBorderWrapper"] {
+    /* Style pour les cartes au niveau max (fond vert foncé et bordure verte visible) */
+    .max-card {
+        background-color: rgba(20, 83, 45, 0.4) !important;
+        border: 2px solid #22c55e !important;
         border-radius: 8px;
+        padding: 12px;
+        margin: -10px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -159,14 +163,21 @@ else:
                     max_lvl = hero.get("maxLevel")
                     progress = min(lvl / max_lvl, 1.0) if max_lvl > 0 else 0
                     remaining = max_lvl - lvl
+                    is_max = (remaining == 0)
                     
                     with st.container(border=True):
+                        if is_max:
+                            st.markdown('<div class="max-card">', unsafe_allow_html=True)
+                            
                         st.markdown(f"**👑 {hero['name']}**")
-                        if remaining == 0:
-                            st.caption(f"Niv. {lvl} / {max_lvl} :green[**(Max ✨)**]")
+                        if is_max:
+                            st.caption(f"Niv. {lvl} / {max_lvl} — **MAX ✨**")
                         else:
                             st.caption(f"Niv. {lvl} / {max_lvl} *(Reste {remaining})*")
                         st.progress(progress)
+                        
+                        if is_max:
+                            st.markdown('</div>', unsafe_allow_html=True)
         else:
             st.info("Aucun héros trouvé.")
                 
@@ -183,15 +194,22 @@ else:
                 remaining = max_lvl - lvl
                 progress = min(lvl / max_lvl, 1.0) if max_lvl > 0 else 0
                 icon = get_icon_emoji(pet['name'])
+                is_max = (remaining == 0)
                 
                 with col:
                     with st.container(border=True):
+                        if is_max:
+                            st.markdown('<div class="max-card">', unsafe_allow_html=True)
+                            
                         st.markdown(f"**{icon} {pet['name']}**")
-                        if remaining == 0:
-                            st.caption(f"Niv. {lvl} / {max_lvl} :green[**(Max ✨)**]")
+                        if is_max:
+                            st.caption(f"Niv. {lvl} / {max_lvl} — **MAX ✨**")
                         else:
                             st.caption(f"Niv. {lvl} / {max_lvl} *(Reste {remaining})*")
                         st.progress(progress)
+                        
+                        if is_max:
+                            st.markdown('</div>', unsafe_allow_html=True)
         else:
             st.info("Aucun familier trouvé.")
 
@@ -205,15 +223,22 @@ else:
                 max_lvl = eq.get("maxLevel")
                 progress = min(lvl / max_lvl, 1.0) if max_lvl > 0 else 0
                 remaining = max_lvl - lvl
+                is_max = (remaining == 0)
                 
                 with col:
                     with st.container(border=True):
+                        if is_max:
+                            st.markdown('<div class="max-card">', unsafe_allow_html=True)
+                            
                         st.markdown(f"**🔮 {eq['name']}**")
-                        if remaining == 0:
-                            st.caption(f"Niv. {lvl} / {max_lvl} :green[**(Max ✨)**]")
+                        if is_max:
+                            st.caption(f"Niv. {lvl} / {max_lvl} — **MAX ✨**")
                         else:
                             st.caption(f"Niv. {lvl} / {max_lvl} *(Reste {remaining})*")
                         st.progress(progress)
+                        
+                        if is_max:
+                            st.markdown('</div>', unsafe_allow_html=True)
         else:
             st.info("Aucun équipement trouvé.")
 
@@ -238,15 +263,22 @@ else:
                 remaining = max_lvl - lvl
                 progress = min(lvl / max_lvl, 1.0) if max_lvl > 0 else 0
                 icon = get_icon_emoji(troop['name'])
+                is_max = (remaining == 0)
                 
                 with col:
                     with st.container(border=True):
+                        if is_max:
+                            st.markdown('<div class="max-card">', unsafe_allow_html=True)
+                            
                         st.markdown(f"**{icon} {troop['name']}**")
-                        if remaining == 0:
-                            st.caption(f"Niv. {lvl} / {max_lvl} :green[**(Max ✨)**]")
+                        if is_max:
+                            st.caption(f"Niv. {lvl} / {max_lvl} — **MAX ✨**")
                         else:
                             st.caption(f"Niv. {lvl} / {max_lvl} *(Reste {remaining})*")
                         st.progress(progress)
+                        
+                        if is_max:
+                            st.markdown('</div>', unsafe_allow_html=True)
         else:
             st.info("Aucune troupe trouvée.")
 
@@ -261,15 +293,22 @@ else:
                 max_lvl = spell.get("maxLevel")
                 remaining = max_lvl - lvl
                 progress = min(lvl / max_lvl, 1.0) if max_lvl > 0 else 0
+                is_max = (remaining == 0)
                 
                 with col:
                     with st.container(border=True):
+                        if is_max:
+                            st.markdown('<div class="max-card">', unsafe_allow_html=True)
+                            
                         st.markdown(f"**🧪 {spell['name']}**")
-                        if remaining == 0:
-                            st.caption(f"Niv. {lvl} / {max_lvl} :green[**(Max ✨)**]")
+                        if is_max:
+                            st.caption(f"Niv. {lvl} / {max_lvl} — **MAX ✨**")
                         else:
                             st.caption(f"Niv. {lvl} / {max_lvl} *(Reste {remaining})*")
                         st.progress(progress)
+                        
+                        if is_max:
+                            st.markdown('</div>', unsafe_allow_html=True)
         else:
             st.info("Aucun sort trouvé.")
 
