@@ -316,7 +316,7 @@ else:
 
     with tab_troops:
         st.subheader("🧪 Progression des Troupes (Village Principal)")
-        raw_troops = [t for t in data.get("troops", []) if t.get("village"] == "home"]
+        raw_troops = [t for t in data.get("troops", []) if t.get("village") == "home"]
         
         def should_exclude(name):
             name_lower = name.lower()
