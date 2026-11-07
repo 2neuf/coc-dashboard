@@ -10,24 +10,15 @@ st.set_page_config(page_title="CoC Multi-Account Dashboard", layout="wide", page
 if "favorites" not in st.session_state:
     st.session_state.favorites = set()
 
-# CSS propre pour que la carte contienne parfaitement tous ses éléments
+# CSS propre pour styliser proprement les conteneurs natifs de Streamlit
 st.markdown("""
 <style>
-    .coc-card {
+    /* Style par défaut des cartes */
+    [data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #1e1e2e;
+        border-radius: 10px;
         border: 1px solid #313244;
-        border-radius: 10px;
-        padding: 15px;
-        margin-bottom: 15px;
-        min-height: 125px;
-    }
-    .coc-card-max {
-        background-color: #064e3b !important;
-        border: 2px solid #22c55e !important;
-        border-radius: 10px;
-        padding: 15px;
-        margin-bottom: 15px;
-        min-height: 125px;
+        padding: 5px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -131,31 +122,29 @@ def render_card(name, lvl, max_lvl, icon="⚔️"):
     is_max = (remaining == 0)
     progress = min(lvl / max_lvl, 1.0) if max_lvl > 0 else 0
     
-    card_class = "coc-card-max" if is_max else "coc-card"
     status_text = "Niv. MAX ✨" if is_max else f"Niv. {lvl} / {max_lvl} *(Reste {remaining})*"
-    
     is_fav = name in st.session_state.favorites
     fav_icon = "⭐" if is_fav else "☆"
     
-    # Conteneur global de la carte
-    st.markdown(f'<div class="{card_class}">', unsafe_allow_html=True)
-    
-    # Ligne du titre et du bouton favori intégré
-    c_title, c_btn = st.columns([0.8, 0.2])
-    with c_title:
-        st.markdown(f"**{icon} {name}**")
-    with c_btn:
-        if st.button(fav_icon, key=f"fav_btn_{name}", help="Favori"):
-            if is_fav:
-                st.session_state.favorites.discard(name)
-            else:
-                st.session_state.favorites.add(name)
-            st.rerun()
+    # Utilisation d'un conteneur natif Streamlit avec bordure
+    with st.container(border=True):
+        col_t, col_btn = st.columns([0.8, 0.2])
+        with col_t:
+            st.markdown(f"**{icon} {name}**")
+        with col_btn:
+            if st.button(fav_icon, key=f"fav_btn_{name}", help="Favori"):
+                if is_fav:
+                    st.session_state.favorites.discard(name)
+                else:
+                    st.session_state.favorites.add(name)
+                st.rerun()
+                
+        if is_max:
+            st.markdown(f":green[**{status_text}**]")
+        else:
+            st.caption(status_text)
             
-    st.caption(status_text)
-    st.progress(progress)
-    
-    st.markdown('</div>', unsafe_allow_html=True)
+        st.progress(progress)
 
 # -------------------------------------------------------------------
 # 2. APP LAYOUT
