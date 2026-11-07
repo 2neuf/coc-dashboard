@@ -10,10 +10,10 @@ st.set_page_config(page_title="CoC Multi-Account Dashboard", layout="wide", page
 if "favorites" not in st.session_state:
     st.session_state.favorites = set()
 
-# CSS pour uniformiser la hauteur exacte de toutes les cartes et fixer leur style
+# CSS pour uniformiser les cartes et styliser proprement le texte max
 st.markdown("""
 <style>
-    /* Force une hauteur minimale rigoureuse et identique pour toutes les cartes */
+    /* Hauteur et dimensions strictes et égales pour toutes les cartes */
     [data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #1e1e2e;
         border-radius: 10px;
@@ -23,6 +23,12 @@ st.markdown("""
         display: flex;
         flex-direction: column;
         justify-content: space-between;
+    }
+    
+    /* Style élégant pour les titres max */
+    .max-title {
+        color: #22c55e !important;
+        font-weight: bold;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -133,7 +139,10 @@ def render_card(name, lvl, max_lvl, icon="⚔️"):
     with st.container(border=True):
         col_t, col_btn = st.columns([0.8, 0.2])
         with col_t:
-            st.markdown(f"**{icon} {name}**")
+            if is_max:
+                st.markdown(f'<span class="max-title">{icon} {name}</span>', unsafe_allow_html=True)
+            else:
+                st.markdown(f"**{icon} {name}**")
         with col_btn:
             if st.button(fav_icon, key=f"fav_btn_{name}", help="Favori"):
                 if is_fav:
