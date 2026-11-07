@@ -53,6 +53,13 @@ def fetch_player_data(player_tag: str):
             err_msg = response.text
         return None, f"Erreur API ({response.status_code}) : {err_msg}"
 
+# Liste officielle de tous les familiers de héros dans Clash of Clans
+HERO_PETS_LIST = [
+    "L.A.S.S.I", "Mighty Yak", "Electro Owl", "Unicorn", 
+    "Phoenix", "Poison Lizard", "Diggy", "Frosty", 
+    "Spirit Fox", "Angry Jelly", "Furnace"
+]
+
 # -------------------------------------------------------------------
 # 2. APP LAYOUT
 # -------------------------------------------------------------------
@@ -108,7 +115,9 @@ else:
             st.info("Aucun héros trouvé.")
                 
         st.subheader("Familiers de Héros (Pets)")
-        pets = data.get("heroPets", [])
+        raw_troops_for_pets = data.get("troops", [])
+        pets = [t for t in raw_troops_for_pets if t.get("name") in HERO_PETS_LIST]
+        
         if pets:
             pet_cols = st.columns(min(4, len(pets)))
             for idx, pet in enumerate(pets):
@@ -138,12 +147,13 @@ else:
         st.subheader("Progression des Troupes (Village Principal)")
         raw_troops = [t for t in data.get("troops", []) if t.get("village") == "home"]
         
-        # Filtrage pour exclure les super troupes
-        def is_super_troop(name):
+        def should_exclude(name):
             name_lower = name.lower()
-            return "super" in name_lower or name in ["Sneaky Goblin", "Rocket Balloon", "Inferno Dragon"]
+            is_super = "super" in name_lower or name in ["Sneaky Goblin", "Rocket Balloon", "Inferno Dragon"]
+            is_pet = name in HERO_PETS_LIST
+            return is_super or is_pet
         
-        troops = [t for t in raw_troops if not is_super_troop(t.get("name", ""))]
+        troops = [t for t in raw_troops if not should_exclude(t.get("name", ""))]
         
         if troops:
             cols = st.columns(4)
