@@ -1,0 +1,3 @@
+streamlit
+coc.py
+libsql-client
