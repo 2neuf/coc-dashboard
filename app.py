@@ -144,10 +144,21 @@ def get_icon_emoji(name):
     if "jelly" in n: return "🪼"
     return "⚔️"
 
-def sort_by_favorites(items):
+def sort_items(items):
+    """
+    Règle de tri :
+    1. Favoris en premier (qu'ils soient max ou non).
+    2. Non-favoris en cours de progression (niveau < max).
+    3. Cartes MAX non-favoris à la toute fin.
+    """
     favs = [i for i in items if i.get('name') in st.session_state.favorites]
-    others = [i for i in items if i.get('name') not in st.session_state.favorites]
-    return favs + others
+    non_favs = [i for i in items if i.get('name') not in st.session_state.favorites]
+    
+    # Parmi les non-favoris, on sépare ceux qui sont max de ceux qui ne le sont pas
+    active_non_favs = [i for i in non_favs if i.get('level', 0) < i.get('maxLevel', 0)]
+    max_non_favs = [i for i in non_favs if i.get('level', 0) >= i.get('maxLevel', 0)]
+    
+    return favs + active_non_favs + max_non_favs
 
 def render_card(name, lvl, max_lvl, icon="⚔️"):
     remaining = max_lvl - lvl
@@ -159,7 +170,6 @@ def render_card(name, lvl, max_lvl, icon="⚔️"):
     fav_icon = "⭐" if is_fav else "☆"
     
     with st.container(border=True):
-        # Répartition des colonnes ajustée à [0.75, 0.25] pour laisser respirer l'icône de favori
         col_t, col_btn = st.columns([0.75, 0.25])
         with col_t:
             if is_max:
@@ -179,7 +189,6 @@ def render_card(name, lvl, max_lvl, icon="⚔️"):
         else:
             st.caption(status_text)
             
-        # Barre de progression HTML custom (verte si max, bleue sinon)
         fill_class = "custom-progress-fill-green" if is_max else "custom-progress-fill-blue"
         bar_html = f"""
         <div class="custom-progress-bg">
@@ -232,7 +241,7 @@ else:
         st.subheader("👑 Héros")
         heroes = data.get("heroes", [])
         home_heroes = [h for h in heroes if h.get("village") == "home"]
-        sorted_heroes = sort_by_favorites(home_heroes)
+        sorted_heroes = sort_items(home_heroes)
         if sorted_heroes:
             hero_cols = st.columns(len(sorted_heroes))
             for idx, hero in enumerate(sorted_heroes):
@@ -244,7 +253,7 @@ else:
         st.subheader("🐾 Familiers de Héros (Pets)")
         raw_troops_for_pets = data.get("troops", [])
         pets = [t for t in raw_troops_for_pets if t.get("name") in HERO_PETS_LIST]
-        sorted_pets = sort_by_favorites(pets)
+        sorted_pets = sort_items(pets)
         
         if sorted_pets:
             pet_cols = st.columns(4)
@@ -257,7 +266,7 @@ else:
 
         st.subheader("⚔️ Équipements de Héros")
         equipment = data.get("heroEquipment", [])
-        sorted_eq = sort_by_favorites(equipment)
+        sorted_eq = sort_items(equipment)
         if sorted_eq:
             eq_cols = st.columns(4)
             for idx, eq in enumerate(sorted_eq):
@@ -278,7 +287,7 @@ else:
             return is_super or is_pet
         
         troops = [t for t in raw_troops if not should_exclude(t.get("name", ""))]
-        sorted_troops = sort_by_favorites(troops)
+        sorted_troops = sort_items(troops)
         
         if sorted_troops:
             cols = st.columns(4)
@@ -291,7 +300,7 @@ else:
 
         st.subheader("⚡ Progression des Sorts (Village Principal)")
         spells = [s for s in data.get("spells", []) if s.get("village") == "home"]
-        sorted_spells = sort_by_favorites(spells)
+        sorted_spells = sort_items(spells)
         
         if sorted_spells:
             spell_cols = st.columns(4)
