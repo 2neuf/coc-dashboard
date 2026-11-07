@@ -10,15 +10,19 @@ st.set_page_config(page_title="CoC Multi-Account Dashboard", layout="wide", page
 if "favorites" not in st.session_state:
     st.session_state.favorites = set()
 
-# CSS pour unifier les cartes et colorer la jauge de progression en vert pour les éléments max
+# CSS pour uniformiser la hauteur exacte de toutes les cartes et fixer leur style
 st.markdown("""
 <style>
-    /* Style par défaut des cartes */
+    /* Force une hauteur minimale rigoureuse et identique pour toutes les cartes */
     [data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #1e1e2e;
         border-radius: 10px;
         border: 1px solid #313244;
-        padding: 5px;
+        padding: 8px;
+        min-height: 135px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -142,16 +146,6 @@ def render_card(name, lvl, max_lvl, icon="⚔️"):
             st.markdown(f":green[**{status_text}**]")
         else:
             st.caption(status_text)
-            
-        # Injection ciblée pour basculer la jauge en vert si l'élément est max
-        if is_max:
-            st.markdown("""
-                <style>
-                div[data-testid="stProgress"] > div > div > div > div {
-                    background-color: #22c55e !important;
-                }
-                </style>
-            """, unsafe_allow_html=True)
             
         st.progress(progress)
 
