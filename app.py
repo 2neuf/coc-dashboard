@@ -57,7 +57,7 @@ def fetch_player_data(player_tag: str):
 HERO_PETS_LIST = [
     "L.A.S.S.I", "Mighty Yak", "Electro Owl", "Unicorn", 
     "Phoenix", "Poison Lizard", "Diggy", "Frosty", 
-    "Spirit Fox", "Angry Jelly", "Furnace", "Sneezy"
+    "Spirit Fox", "Angry Jelly", "Furnace"
 ]
 
 # -------------------------------------------------------------------
@@ -103,48 +103,67 @@ else:
     tab_army, tab_troops, tab_war = st.tabs(["⚔️ Héros, Familiers & Équipements", "🧪 Troupes & Sorts", "🛡️ War & Profil"])
 
     with tab_army:
-        st.subheader("Héros")
+        st.subheader("👑 Héros")
         heroes = data.get("heroes", [])
         home_heroes = [h for h in heroes if h.get("village") == "home"]
         if home_heroes:
             hero_cols = st.columns(len(home_heroes))
             for idx, hero in enumerate(home_heroes):
                 with hero_cols[idx]:
-                    st.metric(hero['name'], f"Lvl {hero['level']} / {hero['maxLevel']}")
+                    with st.container(border=True):
+                        lvl = hero.get("level")
+                        max_lvl = hero.get("maxLevel")
+                        progress = min(lvl / max_lvl, 1.0) if max_lvl > 0 else 0
+                        st.markdown(f"### {hero['name']}")
+                        st.metric("Niveau", f"{lvl} / {max_lvl}")
+                        st.progress(progress)
         else:
             st.info("Aucun héros trouvé.")
                 
-        st.subheader("Familiers de Héros (Pets)")
+        st.subheader("🐾 Familiers de Héros (Pets)")
         raw_troops_for_pets = data.get("troops", [])
         pets = [t for t in raw_troops_for_pets if t.get("name") in HERO_PETS_LIST]
         
         if pets:
-            pet_cols = st.columns(min(4, len(pets)))
+            pet_cols = st.columns(4)
             for idx, pet in enumerate(pets):
-                col_idx = idx % 4
+                col = pet_cols[idx % 4]
                 lvl = pet.get("level")
                 max_lvl = pet.get("maxLevel")
                 remaining = max_lvl - lvl
-                with pet_cols[col_idx]:
-                    if remaining == 0:
-                        st.success(f"**{pet['name']}**\n\nMax ({lvl}/{max_lvl}) ✨")
-                    else:
-                        st.info(f"**{pet['name']}**\n\nNiveau {lvl} / {max_lvl}\n*(Reste {remaining} niv.)*")
+                progress = min(lvl / max_lvl, 1.0) if max_lvl > 0 else 0
+                
+                with col:
+                    with st.container(border=True):
+                        st.markdown(f"**{pet['name']}**")
+                        if remaining == 0:
+                            st.success(f"Max ({lvl}/{max_lvl}) ✨")
+                        else:
+                            st.caption(f"Niv. {lvl} / {max_lvl} *(Reste {remaining})*")
+                        st.progress(progress)
         else:
             st.info("Aucun familier trouvé.")
 
-        st.subheader("Équipements de Héros")
+        st.subheader("⚔️ Équipements de Héros")
         equipment = data.get("heroEquipment", [])
         if equipment:
-            eq_cols = st.columns(min(4, len(equipment)))
+            eq_cols = st.columns(4)
             for idx, eq in enumerate(equipment):
-                col_idx = idx % 4
-                eq_cols[col_idx].write(f"**{eq['name']}**\n\nNiveau {eq['level']} (Max {eq['maxLevel']})")
+                col = eq_cols[idx % 4]
+                lvl = eq.get("level")
+                max_lvl = eq.get("maxLevel")
+                progress = min(lvl / max_lvl, 1.0) if max_lvl > 0 else 0
+                
+                with col:
+                    with st.container(border=True):
+                        st.markdown(f"**{eq['name']}**")
+                        st.caption(f"Niv. {lvl} / {max_lvl}")
+                        st.progress(progress)
         else:
             st.info("Aucun équipement trouvé.")
 
     with tab_troops:
-        st.subheader("Progression des Troupes (Village Principal)")
+        st.subheader("🧪 Progression des Troupes (Village Principal)")
         raw_troops = [t for t in data.get("troops", []) if t.get("village") == "home"]
         
         def should_exclude(name):
@@ -162,16 +181,20 @@ else:
                 lvl = troop.get("level")
                 max_lvl = troop.get("maxLevel")
                 remaining = max_lvl - lvl
+                progress = min(lvl / max_lvl, 1.0) if max_lvl > 0 else 0
                 
                 with col:
-                    if remaining == 0:
-                        st.success(f"**{troop['name']}**\n\nMax ({lvl}/{max_lvl}) ✨")
-                    else:
-                        st.info(f"**{troop['name']}**\n\nNiveau {lvl} / {max_lvl}\n*(Reste {remaining} niv.)*")
+                    with st.container(border=True):
+                        st.markdown(f"**{troop['name']}**")
+                        if remaining == 0:
+                            st.success(f"Max ({lvl}/{max_lvl}) ✨")
+                        else:
+                            st.caption(f"Niv. {lvl} / {max_lvl} *(Reste {remaining})*")
+                        st.progress(progress)
         else:
             st.info("Aucune troupe trouvée.")
 
-        st.subheader("Progression des Sorts (Village Principal)")
+        st.subheader("⚡ Progression des Sorts (Village Principal)")
         spells = [s for s in data.get("spells", []) if s.get("village") == "home"]
         
         if spells:
@@ -181,17 +204,22 @@ else:
                 lvl = spell.get("level")
                 max_lvl = spell.get("maxLevel")
                 remaining = max_lvl - lvl
+                progress = min(lvl / max_lvl, 1.0) if max_lvl > 0 else 0
                 
                 with col:
-                    if remaining == 0:
-                        st.success(f"**{spell['name']}**\n\nMax ({lvl}/{max_lvl}) ✨")
-                    else:
-                        st.info(f"**{spell['name']}**\n\nNiveau {lvl} / {max_lvl}\n*(Reste {remaining} niv.)*")
+                    with st.container(border=True):
+                        st.markdown(f"**{spell['name']}**")
+                        if remaining == 0:
+                            st.success(f"Max ({lvl}/{max_lvl}) ✨")
+                        else:
+                            st.caption(f"Niv. {lvl} / {max_lvl} *(Reste {remaining})*")
+                        st.progress(progress)
         else:
             st.info("Aucun sort trouvé.")
 
     with tab_war:
-        st.subheader("Performances de Guerre")
-        st.write(f"**Attaques gagnées:** {data.get('attackWins', 0)}")
-        st.write(f"**Défenses gagnées:** {data.get('defenseWins', 0)}")
-        st.write(f"**Clan:** {data.get('clan', {}).get('name', 'Aucun clan')}")
+        st.subheader("📊 Performances de Guerre & Profil")
+        col_w1, col_w2, col_w3 = st.columns(3)
+        col_w1.metric("Attaques gagnées", data.get('attackWins', 0))
+        col_w2.metric("Défenses gagnées", data.get('defenseWins', 0))
+        col_w3.metric("Clan", data.get('clan', {}).get('name', 'Aucun clan'))
