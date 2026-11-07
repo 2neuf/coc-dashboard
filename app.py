@@ -10,7 +10,7 @@ st.set_page_config(page_title="CoC Multi-Account Dashboard", layout="wide", page
 if "favorites" not in st.session_state:
     st.session_state.favorites = set()
 
-# Injection CSS pour des cartes uniformes et un vrai fond vert stylisé quand c'est max
+# Injection CSS pour des cartes uniformes, un fond vert max et un bouton favori discret dans la carte
 st.markdown("""
 <style>
     .coc-card {
@@ -19,7 +19,7 @@ st.markdown("""
         border-radius: 10px;
         padding: 12px 15px;
         margin-bottom: 10px;
-        height: 125px;
+        height: 120px;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
@@ -30,7 +30,7 @@ st.markdown("""
         border-radius: 10px;
         padding: 12px 15px;
         margin-bottom: 10px;
-        height: 125px;
+        height: 120px;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
@@ -39,6 +39,7 @@ st.markdown("""
         display: flex;
         justify-content: space-between;
         align-items: center;
+        width: 100%;
     }
     .card-title {
         font-weight: bold;
@@ -157,22 +158,23 @@ def render_card(name, lvl, max_lvl, icon="⚔️"):
     status_text = "Niv. MAX ✨" if is_max else f"Niv. {lvl} / {max_lvl} *(Reste {remaining})*"
     
     is_fav = name in st.session_state.favorites
+    fav_icon = "⭐" if is_fav else "☆"
     
-    # Checkbox pour gérer le favori directement sur la carte
-    col_title, col_fav = st.columns([0.8, 0.2])
-    with col_title:
-        st.markdown(f'<div class="{card_class}">'
-                    f'<div class="card-header"><span class="card-title">{icon} {name}</span></div>'
-                    f'<div class="card-info">{status_text}</div>', unsafe_allow_html=True)
-    with col_fav:
-        new_fav = st.checkbox("⭐", value=is_fav, key=f"fav_{name}", label_visibility="collapsed")
-        if new_fav != is_fav:
-            if new_fav:
-                st.session_state.favorites.add(name)
-            else:
+    # Structure de la carte avec bouton favori intégré proprement
+    st.markdown(f'<div class="{card_class}">', unsafe_allow_html=True)
+    
+    col_t, col_b = st.columns([0.8, 0.2])
+    with col_t:
+        st.markdown(f"<div class='card-title'>{icon} {name}</div>", unsafe_allow_html=True)
+    with col_b:
+        if st.button(fav_icon, key=f"fav_btn_{name}", help="Ajouter/Retirer des favoris"):
+            if is_fav:
                 st.session_state.favorites.discard(name)
+            else:
+                st.session_state.favorites.add(name)
             st.rerun()
-
+            
+    st.markdown(f"<div class='card-info'>{status_text}</div>", unsafe_allow_html=True)
     st.progress(progress)
     st.markdown('</div>', unsafe_allow_html=True)
 
