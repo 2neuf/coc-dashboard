@@ -351,7 +351,7 @@ else:
             st.info("Aucun engin de siège trouvé.")
 
         st.subheader("⚡ Progression des Sorts (Village Principal)")
-        spells = [s for s in data.get("spells", []) if s.get("village"] == "home"]
+        spells = [s for s in data.get("spells", []) if s.get("village") == "home"]
         sorted_spells = sort_items(spells, current_favorites)
         
         if sorted_spells:
