@@ -400,7 +400,7 @@ else:
             st.info("Aucune troupe trouvée.")
 
         st.subheader("🛒 Engins de Siège")
-        siege_machines = [t for t in raw_troops if t.get("name"] in SIEGE_MACHINES_LIST]
+        siege_machines = [t for t in raw_troops if t.get("name") in SIEGE_MACHINES_LIST]
         sorted_siege = sort_items(siege_machines, current_favorites)
         
         if sorted_siege:
