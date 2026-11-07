@@ -10,15 +10,14 @@ st.set_page_config(page_title="CoC Multi-Account Dashboard", layout="wide", page
 if "favorites" not in st.session_state:
     st.session_state.favorites = set()
 
-# CSS pour colorer proprement les conteneurs natifs de Streamlit
+# CSS élégant pour cibler et illuminer les cartes MAX avec une belle bordure et une lueur
 st.markdown("""
 <style>
-    /* Carte normale */
-    [data-testid="stVerticalBlockBorderWrapper"] {
-        background-color: #1e1e2e;
+    /* Style pour les cartes au niveau MAX (bordure verte lumineuse) */
+    .max-glow {
+        border: 2px solid #22c55e !important;
+        box-shadow: 0 0 12px rgba(34, 197, 94, 0.3);
         border-radius: 10px;
-        border: 1px solid #313244;
-        padding: 5px;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -126,16 +125,13 @@ def render_card(name, lvl, max_lvl, icon="⚔️"):
     is_fav = name in st.session_state.favorites
     fav_icon = "⭐" if is_fav else "☆"
     
-    # Injection conditionnelle du style vert directement pour la carte max
-    card_style = """
-        background-color: #064e3b !important;
-        border: 2px solid #22c55e !important;
-        border-radius: 10px;
-        padding: 5px;
-    """ if is_max else ""
+    # On applique la classe CSS "max-glow" uniquement si l'élément est max
+    wrapper_class = "max-glow" if is_max else ""
     
-    st.markdown(f'<div style="{card_style}">', unsafe_allow_html=True)
     with st.container(border=True):
+        if is_max:
+            st.markdown(f'<div class="{wrapper_class}">', unsafe_allow_html=True)
+            
         col_t, col_btn = st.columns([0.8, 0.2])
         with col_t:
             st.markdown(f"**{icon} {name}**")
@@ -153,7 +149,9 @@ def render_card(name, lvl, max_lvl, icon="⚔️"):
             st.caption(status_text)
             
         st.progress(progress)
-    st.markdown('</div>', unsafe_allow_html=True)
+        
+        if is_max:
+            st.markdown('</div>', unsafe_allow_html=True)
 
 # -------------------------------------------------------------------
 # 2. APP LAYOUT
