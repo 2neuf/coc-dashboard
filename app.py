@@ -52,18 +52,11 @@ def init_db():
         )
     """)
 
-import urllib.parse
-import re
-
 def fetch_player_data(player_tag: str):
-    # Nettoyage rigoureux : enlève les espaces et force les majuscules
     clean_tag = player_tag.strip().upper()
-    
-    # S'assure que le tag commence bien par un #
     if not clean_tag.startswith("#"):
         clean_tag = "#" + clean_tag
         
-    # Encodage sécurisé de l'URL pour l'API Supercell
     encoded_tag = urllib.parse.quote(clean_tag, safe='')
     url = f"https://api.clashofclans.com/v1/players/{encoded_tag}"
     
@@ -75,7 +68,12 @@ def fetch_player_data(player_tag: str):
     if response.status_code == 200:
         return response.json(), None
     else:
-        return None, f"Error {response.status_code}: {response.json().get('message', 'Failed to fetch data')}"
+        try:
+            err_msg = response.json().get('message', 'Unknown error')
+        except:
+            err_msg = response.text
+        return None, f"Erreur API ({response.status_code}) : {err_msg}"
+
 # -------------------------------------------------------------------
 # 2. APP LAYOUT
 # -------------------------------------------------------------------
@@ -88,7 +86,8 @@ except Exception as e:
     st.sidebar.error(f"❌ DB Error: {e}")
 
 st.sidebar.header("Account Setup")
-player_tag_input = st.sidebar.text_input("Enter Player Tag", placeholder="#2ABC1234")
+# Pré-rempli avec votre tag exact
+player_tag_input = st.sidebar.text_input("Enter Player Tag", value="#YJ0U9P89V", placeholder="#2ABC1234")
 
 if st.sidebar.button("Fetch Account Data"):
     if player_tag_input:
