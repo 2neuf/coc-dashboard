@@ -71,10 +71,15 @@ def init_db():
             player_tag TEXT PRIMARY KEY,
             name TEXT,
             town_hall INTEGER,
-            gold_pass_boost INTEGER DEFAULT 0,
-            active_composition TEXT DEFAULT 'Aucune'
+            gold_pass_boost INTEGER DEFAULT 0
         )
     """)
+    # Migration sécurisée pour ajouter la colonne active_composition si elle n'existe pas
+    try:
+        conn.execute("ALTER TABLE accounts ADD COLUMN active_composition TEXT DEFAULT 'Aucune'")
+    except Exception:
+        pass # La colonne existe déjà
+
     # Table des favoris
     conn.execute("""
         CREATE TABLE IF NOT EXISTS favorites (
@@ -93,9 +98,9 @@ def init_db():
     
     # Insertion de test pour "Mini"
     conn.execute("""
-        INSERT OR IGNORE INTO accounts (player_tag, name, town_hall) 
-        VALUES (?, ?, ?)
-    """, ["#YJ0U9P89V", "Mini", 18])
+        INSERT OR IGNORE INTO accounts (player_tag, name, town_hall, active_composition) 
+        VALUES (?, ?, ?, ?)
+    """, ["#YJ0U9P89V", "Mini", 18, "Aucune"])
 
 def get_db_favorites(player_tag):
     conn = get_db_client()
@@ -284,12 +289,12 @@ else:
     except Exception as e:
         st.warning(f"Could not update Turso DB: {e}")
 
-    # Récupération sécurisée de la ligue (avec fallback trophées si Légende non inscrite)
+    # Récupération sécurisée de la ligue (fallback sur les trophées si Légende non inscrite ou 0)
     league_info = data.get("league")
-    if league_info and isinstance(league_info, dict):
-        league_name = league_info.get("name", "Non classé")
+    trophies = data.get("trophies", 0)
+    if league_info and isinstance(league_info, dict) and league_info.get("name"):
+        league_name = league_info.get("name")
     else:
-        trophies = data.get("trophies", 0)
         if trophies >= 5000:
             league_name = f"Légende ({trophies} 🏆)"
         elif trophies >= 4000:
@@ -317,22 +322,36 @@ else:
         all_accs = get_all_accounts()
         overview_data = []
         
+        conn_db = get_db_client()
         for acc in all_accs:
             p_tag, p_name, p_th, p_comp = acc[0], acc[1], acc[2], acc[3]
-            # Fetch rapide pour chaque compte pour récupérer la ligue et les infos en direct
+            
+            # Fetch pour chaque compte pour récupérer la ligue en direct
             p_data, p_err = fetch_player_data(p_tag)
             if not p_err and p_data:
                 l_info = p_data.get("league")
-                l_name = l_info.get("name", "Non classé") if (l_info and isinstance(l_info, dict)) else f"{p_data.get('trophies', 0)} 🏆"
+                p_trophies = p_data.get("trophies", 0)
+                if l_info and isinstance(l_info, dict) and l_info.get("name"):
+                    l_name = l_info.get("name")
+                else:
+                    l_name = f"Légende ({p_trophies} 🏆)" if p_trophies >= 5000 else f"{p_trophies} 🏆"
             else:
                 l_name = "Inconnu"
             
+            # Récupération du détail de la composition active
+            comp_details_text = "Aucune"
+            if p_comp and p_comp != "Aucune":
+                comp_res = conn_db.execute("SELECT details FROM compositions WHERE comp_name = ?", [p_comp])
+                if comp_res.rows:
+                    comp_details_text = f"📌 {p_comp} — {comp_res.rows[0][0]}"
+                else:
+                    comp_details_text = p_comp
+
             overview_data.append({
                 "Pseudo": p_name,
                 "HDV": f"TH {p_th}",
                 "Ligue": l_name,
-                "Composition d'attaque": p_comp,
-                "Tag": p_tag
+                "Composition d'attaque": comp_details_text
             })
             
         st.dataframe(overview_data, use_container_width=True)
@@ -448,7 +467,6 @@ else:
             comp_title = st.text_input("Nom de la composition (ex: Root Rider Spam)")
             
             st.markdown("### Sélection des Éléments de la Compo")
-            # Listes déroulantes pour configurer la compo
             available_heroes = [h['name'] for h in data.get("heroes", []) if h.get("village") == "home"]
             selected_heroes_comp = st.multiselect("Sélectionner les Héros", available_heroes)
             
