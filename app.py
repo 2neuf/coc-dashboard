@@ -1,6 +1,6 @@
 import streamlit as st
 import requests
-import libsql_experimental as libsql
+import libsql_client as libsql
 
 st.set_page_config(page_title="CoC Multi-Account Dashboard", layout="wide", page_icon="🛡️")
 
