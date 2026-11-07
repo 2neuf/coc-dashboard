@@ -163,4 +163,4 @@ else:
         st.subheader("Performances de Guerre")
         st.write(f"**Attaques gagnées:** {data.get('attackWins', 0)}")
         st.write(f"**Défenses gagnées:** {data.get('defenseWins', 0)}")
-        st.write(f"**Clan:** {data.
+        st.write(f"**Clan:** {data.get('clan', {}).get('name', 'Aucun clan')}")
