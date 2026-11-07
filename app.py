@@ -367,7 +367,7 @@ else:
             hero_cols = st.columns(len(sorted_heroes))
             for idx, hero in enumerate(sorted_heroes):
                 with hero_cols[idx]:
-                    render_card(hero['name'], hero.get("level"), hero.get("maxLevel"), current_tag, current_favorites, get_icon_emoji(hero['name']))
+                    render_card(hero.get('name'), hero.get("level"), hero.get("maxLevel"), current_tag, current_favorites, get_icon_emoji(hero.get('name', '')))
         else:
             st.info("Aucun héros trouvé.")
                 
@@ -381,7 +381,7 @@ else:
             for idx, pet in enumerate(sorted_pets):
                 col = pet_cols[idx % 4]
                 with col:
-                    render_card(pet['name'], pet.get("level"), pet.get("maxLevel"), current_tag, current_favorites, get_icon_emoji(pet['name']))
+                    render_card(pet.get('name'), pet.get("level"), pet.get("maxLevel"), current_tag, current_favorites, get_icon_emoji(pet.get('name', '')))
         else:
             st.info("Aucun familier trouvé.")
 
@@ -393,7 +393,7 @@ else:
             for idx, eq in enumerate(sorted_eq):
                 col = eq_cols[idx % 4]
                 with col:
-                    render_card(eq['name'], eq.get("level"), eq.get("maxLevel"), current_tag, current_favorites, get_icon_emoji(eq['name']))
+                    render_card(eq.get('name'), eq.get("level"), eq.get("maxLevel"), current_tag, current_favorites, get_icon_emoji(eq.get('name', '')))
         else:
             st.info("Aucun équipement trouvé.")
 
@@ -402,7 +402,7 @@ else:
     # -------------------------------------------------------------------
     with tab_troops:
         st.subheader("🧪 Progression des Troupes (Village Principal)")
-        raw_troops = [t for t in data.get("troops", []) if t.get("village"] == "home"]
+        raw_troops = [t for t in data.get("troops", []) if t.get("village") == "home"]
         
         def should_exclude(name):
             name_lower = name.lower()
@@ -419,7 +419,7 @@ else:
             for idx, troop in enumerate(sorted_troops):
                 col = cols[idx % 4]
                 with col:
-                    render_card(troop['name'], troop.get("level"), troop.get("maxLevel"), current_tag, current_favorites, get_icon_emoji(troop['name']))
+                    render_card(troop.get('name'), troop.get("level"), troop.get("maxLevel"), current_tag, current_favorites, get_icon_emoji(troop.get('name', '')))
         else:
             st.info("Aucune troupe trouvée.")
 
@@ -432,12 +432,12 @@ else:
             for idx, siege in enumerate(sorted_siege):
                 col = siege_cols[idx % 4]
                 with col:
-                    render_card(siege['name'], siege.get("level"), siege.get("maxLevel"), current_tag, current_favorites, get_icon_emoji(siege['name']))
+                    render_card(siege.get('name'), siege.get("level"), siege.get("maxLevel"), current_tag, current_favorites, get_icon_emoji(siege.get('name', '')))
         else:
             st.info("Aucun engin de siège trouvé.")
 
         st.subheader("⚡ Progression des Sorts (Village Principal)")
-        spells = [s for s in data.get("spells", []) if s.get("village"] == "home"]
+        spells = [s for s in data.get("spells", []) if s.get("village") == "home"]
         sorted_spells = sort_items(spells, current_favorites)
         
         if sorted_spells:
@@ -445,12 +445,12 @@ else:
             for idx, spell in enumerate(sorted_spells):
                 col = spell_cols[idx % 4]
                 with col:
-                    render_card(spell['name'], spell.get("level"), spell.get("maxLevel"), current_tag, current_favorites, "🧪")
+                    render_card(spell.get('name'), spell.get("level"), spell.get("maxLevel"), current_tag, current_favorites, "🧪")
         else:
             st.info("Aucun sort trouvé.")
 
     # -------------------------------------------------------------------
-    # TAB 4: PARAMÉTRAGE DES COMPOSITIONS D'ATTAQUE (Équipements par Héros garantis)
+    # TAB 4: PARAMÉTRAGE DES COMPOSITIONS D'ATTAQUE
     # -------------------------------------------------------------------
     with tab_config:
         st.subheader("⚙️ Paramétrage des Compositions d'Attaque")
@@ -458,7 +458,7 @@ else:
         comp_title = st.text_input("Nom de la composition (ex: Root Rider Spam)")
         
         st.markdown("### 👑 Sélection des Héros")
-        available_heroes = [h['name'] for h in data.get("heroes", []) if h.get("village"] == "home"]
+        available_heroes = [h.get('name') for h in data.get("heroes", []) if h.get("village") == "home"]
             
         hero_labels = [f"{get_icon_emoji(h)} {h}" for h in available_heroes]
         hero_map = {f"{get_icon_emoji(h)} {h}": h for h in available_heroes}
@@ -484,8 +484,7 @@ else:
                     pet_choice = pet_options[selected_pet_idx]
                 
                 with col_eq:
-                    # Utiliser directement la liste officielle du dictionnaire pour ce héros (pour ne rien rater !)
-                    hero_specific_eqs = HERO_EQUIPMENT_MAPPING.get(hero, [e['name'] for e in data.get("heroEquipment", [])])
+                    hero_specific_eqs = HERO_EQUIPMENT_MAPPING.get(hero, [e.get('name') for e in data.get("heroEquipment", [])])
                     
                     eq_labels = [f"{get_icon_emoji(e)} {e}" for e in hero_specific_eqs]
                     eq_map = {f"{get_icon_emoji(e)} {e}": e for e in hero_specific_eqs}
@@ -493,7 +492,6 @@ else:
                     selected_eq_labels = st.multiselect(f"Équipements pour {hero} (max 2)", eq_labels, key=f"eq_{hero}")
                     eq_choices = [eq_map[label] for label in selected_eq_labels]
                     
-                    # Message d'invitation/alerte immédiat sous le champ si aucun équipement n'est sélectionné
                     if not eq_choices:
                         st.warning(f"⚠️ Veuillez joindre et sélectionner les équipements de **{hero}** (maximum 2).")
                 
@@ -501,13 +499,13 @@ else:
                 st.divider()
 
         st.markdown("### 🧪 Troupes & Sorts de la Compo")
-        available_troops = [t['name'] for t in raw_troops if not should_exclude(t.get("name", ""))]
+        available_troops = [t.get('name') for t in raw_troops if not should_exclude(t.get("name", ""))]
         troop_labels = [f"{get_icon_emoji(t)} {t}" for t in available_troops]
         troop_map = {f"{get_icon_emoji(t)} {t}": t for t in available_troops}
         selected_troop_labels = st.multiselect("Sélectionner les Troupes", troop_labels, key="troops_multiselect")
         selected_troops_comp = [troop_map[l] for l in selected_troop_labels]
         
-        available_spells = [s['name'] for s in spells]
+        available_spells = [s.get('name') for s in spells]
         spell_labels = [f"🧪 {s}" for s in available_spells]
         spell_map = {f"🧪 {s}": s for s in available_spells}
         selected_spell_labels = st.multiselect("Sélectionner les Sorts", spell_labels, key="spells_multiselect")
