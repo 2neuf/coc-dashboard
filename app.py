@@ -67,7 +67,6 @@ def get_db_client():
 
 def init_db():
     conn = get_db_client()
-    # Table des comptes (avec le nom "Mini" configuré en dur pour le tag cible)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS accounts (
             player_tag TEXT PRIMARY KEY,
@@ -76,7 +75,6 @@ def init_db():
             gold_pass_boost INTEGER DEFAULT 0
         )
     """)
-    # Table dédiée pour stocker les favoris par joueur/pseudo
     conn.execute("""
         CREATE TABLE IF NOT EXISTS favorites (
             player_tag TEXT,
@@ -85,7 +83,6 @@ def init_db():
         )
     """)
     
-    # Insertion en dur du joueur "Mini"
     conn.execute("""
         INSERT OR IGNORE INTO accounts (player_tag, name, town_hall) 
         VALUES (?, ?, ?)
@@ -265,10 +262,13 @@ else:
     except Exception as e:
         st.warning(f"Could not update Turso DB: {e}")
 
+    # Récupération sécurisée du nom de la ligue (parfois absent si non classé)
+    league_name = data.get("league", {}).get("name", "Non classé")
+
     col1, col2, col3, col4 = st.columns(4)
     col1.metric("Player Name", player_name)
     col2.metric("Town Hall Level", f"TH {data.get('townHallLevel')}")
-    col3.metric("Trophies", data.get("trophies"))
+    col3.metric("League", league_name)
     col4.metric("War Stars", data.get("warStars"))
 
     st.divider()
