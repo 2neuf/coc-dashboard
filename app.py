@@ -6,10 +6,6 @@ from datetime import datetime
 
 st.set_page_config(page_title="CoC Multi-Account Dashboard", layout="wide", page_icon="🛡️")
 
-# Initialisation du système de favoris
-if "favorites" not in st.session_state:
-    st.session_state.favorites = set()
-
 # CSS pour uniformiser les cartes et styliser les barres de progression personnalisées
 st.markdown("""
 <style>
@@ -71,6 +67,7 @@ def get_db_client():
 
 def init_db():
     conn = get_db_client()
+    # Table des comptes (avec le nom "Mini" configuré en dur pour le tag cible)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS accounts (
             player_tag TEXT PRIMARY KEY,
@@ -79,6 +76,33 @@ def init_db():
             gold_pass_boost INTEGER DEFAULT 0
         )
     """)
+    # Table dédiée pour stocker les favoris par joueur/pseudo
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS favorites (
+            player_tag TEXT,
+            item_name TEXT,
+            PRIMARY KEY (player_tag, item_name)
+        )
+    """)
+    
+    # Insertion en dur du joueur "Mini"
+    conn.execute("""
+        INSERT OR IGNORE INTO accounts (player_tag, name, town_hall) 
+        VALUES (?, ?, ?)
+    """, ["#YJ0U9P89V", "Mini", 18])
+
+def get_db_favorites(player_tag):
+    conn = get_db_client()
+    res = conn.execute("SELECT item_name FROM favorites WHERE player_tag = ?", [player_tag])
+    return {row[0] for row in res.rows}
+
+def add_db_favorite(player_tag, item_name):
+    conn = get_db_client()
+    conn.execute("INSERT OR IGNORE INTO favorites (player_tag, item_name) VALUES (?, ?)", [player_tag, item_name])
+
+def remove_db_favorite(player_tag, item_name):
+    conn = get_db_client()
+    conn.execute("DELETE FROM favorites WHERE player_tag = ? AND item_name = ?", [player_tag, item_name])
 
 def fetch_player_data(player_tag: str):
     clean_tag = player_tag.strip().upper()
@@ -106,7 +130,7 @@ def fetch_player_data(player_tag: str):
 HERO_PETS_LIST = [
     "L.A.S.S.I", "Mighty Yak", "Electro Owl", "Unicorn", 
     "Phoenix", "Poison Lizard", "Diggy", "Frosty", 
-    "Spirit Fox", "Angry Jelly", "Sneazzy"
+    "Spirit Fox", "Angry Jelly", "Furnace"
 ]
 
 def get_icon_emoji(name):
@@ -144,13 +168,13 @@ def get_icon_emoji(name):
     if "jelly" in n: return "🪼"
     return "⚔️"
 
-def sort_items(items):
+def sort_items(items, current_favorites):
     """
     Règle de tri globale :
-    1. Statut favori prioritaire absolu.
+    1. Statut favori prioritaire absolu (basé sur la DB).
        - Entre favoris : tri par plus petite différence de niveaux (max favoris à la fin des favoris).
     2. Pour les non-favoris :
-       - D'abord les éléments en cours de progression (triés par plus petite différence de niveau en premier, puis plus grosse différence).
+       - D'abord les éléments en cours de progression (triés par plus petite différence de niveau).
        - Enfin les éléments MAX à la toute fin.
     """
     def get_diff(item):
@@ -158,29 +182,26 @@ def sort_items(items):
         max_lvl = item.get('maxLevel', 0)
         return max_lvl - lvl
 
-    # Séparation favoris / non-favoris
-    favs = [i for i in items if i.get('name') in st.session_state.favorites]
-    non_favs = [i for i in items if i.get('name') not in st.session_state.favorites]
+    favs = [i for i in items if i.get('name') in current_favorites]
+    non_favs = [i for i in items if i.get('name') not in current_favorites]
     
-    # Tri des favoris : actifs par différence croissante, puis les max favoris
     active_favs = sorted([i for i in favs if get_diff(i) > 0], key=get_diff)
     max_favs = [i for i in favs if get_diff(i) == 0]
     sorted_favs = active_favs + max_favs
     
-    # Tri des non-favoris : actifs par différence croissante, puis les max non-favoris
     active_non_favs = sorted([i for i in non_favs if get_diff(i) > 0], key=get_diff)
     max_non_favs = [i for i in non_favs if get_diff(i) == 0]
     sorted_non_favs = active_non_favs + max_non_favs
     
     return sorted_favs + sorted_non_favs
 
-def render_card(name, lvl, max_lvl, icon="⚔️"):
+def render_card(name, lvl, max_lvl, current_tag, current_favorites, icon="⚔️"):
     remaining = max_lvl - lvl
     is_max = (remaining == 0)
     progress_pct = int(min(lvl / max_lvl, 1.0) * 100) if max_lvl > 0 else 0
     
     status_text = "Niv. MAX ✨" if is_max else f"Niv. {lvl} / {max_lvl} *(Reste {remaining})*"
-    is_fav = name in st.session_state.favorites
+    is_fav = name in current_favorites
     fav_icon = "⭐" if is_fav else "☆"
     
     with st.container(border=True):
@@ -193,9 +214,9 @@ def render_card(name, lvl, max_lvl, icon="⚔️"):
         with col_btn:
             if st.button(fav_icon, key=f"fav_btn_{name}", help="Favori"):
                 if is_fav:
-                    st.session_state.favorites.discard(name)
+                    remove_db_favorite(current_tag, name)
                 else:
-                    st.session_state.favorites.add(name)
+                    add_db_favorite(current_tag, name)
                 st.rerun()
                 
         if is_max:
@@ -222,9 +243,14 @@ try:
 except Exception as e:
     st.sidebar.error(f"❌ DB Error: {e}")
 
-st.sidebar.header("Account Active")
 current_tag = "#YJ0U9P89V"
-st.sidebar.info(f"Tag ciblé : **{current_tag}**")
+player_name = "Mini" # Joueur défini en dur
+
+st.sidebar.header("Account Active")
+st.sidebar.info(f"Pseudo : **{player_name}**\nTag : **{current_tag}**")
+
+# Récupération des favoris de ce joueur depuis la base de données Turso
+current_favorites = get_db_favorites(current_tag)
 
 with st.spinner("Fetching data from Supercell API..."):
     data, err = fetch_player_data(current_tag)
@@ -236,13 +262,13 @@ else:
         conn = get_db_client()
         conn.execute(
             "INSERT OR REPLACE INTO accounts (player_tag, name, town_hall) VALUES (?, ?, ?)",
-            [data["tag"], data["name"], data["townHallLevel"]]
+            [data["tag"], player_name, data["townHallLevel"]]
         )
     except Exception as e:
         st.warning(f"Could not update Turso DB: {e}")
 
     col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Player Name", data.get("name"))
+    col1.metric("Player Name", player_name)
     col2.metric("Town Hall Level", f"TH {data.get('townHallLevel')}")
     col3.metric("Trophies", data.get("trophies"))
     col4.metric("War Stars", data.get("warStars"))
@@ -255,38 +281,38 @@ else:
         st.subheader("👑 Héros")
         heroes = data.get("heroes", [])
         home_heroes = [h for h in heroes if h.get("village") == "home"]
-        sorted_heroes = sort_items(home_heroes)
+        sorted_heroes = sort_items(home_heroes, current_favorites)
         if sorted_heroes:
             hero_cols = st.columns(len(sorted_heroes))
             for idx, hero in enumerate(sorted_heroes):
                 with hero_cols[idx]:
-                    render_card(hero['name'], hero.get("level"), hero.get("maxLevel"), "👑")
+                    render_card(hero['name'], hero.get("level"), hero.get("maxLevel"), current_tag, current_favorites, "👑")
         else:
             st.info("Aucun héros trouvé.")
                 
         st.subheader("🐾 Familiers de Héros (Pets)")
         raw_troops_for_pets = data.get("troops", [])
-        pets = [t for t in raw_troops_for_pets if t.get("name") in HERO_PETS_LIST]
-        sorted_pets = sort_items(pets)
+        pets = [t for t in raw_troops_for_pets if t.get("name"] in HERO_PETS_LIST]
+        sorted_pets = sort_items(pets, current_favorites)
         
         if sorted_pets:
             pet_cols = st.columns(4)
             for idx, pet in enumerate(sorted_pets):
                 col = pet_cols[idx % 4]
                 with col:
-                    render_card(pet['name'], pet.get("level"), pet.get("maxLevel"), get_icon_emoji(pet['name']))
+                    render_card(pet['name'], pet.get("level"), pet.get("maxLevel"), current_tag, current_favorites, get_icon_emoji(pet['name']))
         else:
             st.info("Aucun familier trouvé.")
 
         st.subheader("⚔️ Équipements de Héros")
         equipment = data.get("heroEquipment", [])
-        sorted_eq = sort_items(equipment)
+        sorted_eq = sort_items(equipment, current_favorites)
         if sorted_eq:
             eq_cols = st.columns(4)
             for idx, eq in enumerate(sorted_eq):
                 col = eq_cols[idx % 4]
                 with col:
-                    render_card(eq['name'], eq.get("level"), eq.get("maxLevel"), "🔮")
+                    render_card(eq['name'], eq.get("level"), eq.get("maxLevel"), current_tag, current_favorites, "🔮")
         else:
             st.info("Aucun équipement trouvé.")
 
@@ -301,27 +327,27 @@ else:
             return is_super or is_pet
         
         troops = [t for t in raw_troops if not should_exclude(t.get("name", ""))]
-        sorted_troops = sort_items(troops)
+        sorted_troops = sort_items(troops, current_favorites)
         
         if sorted_troops:
             cols = st.columns(4)
             for idx, troop in enumerate(sorted_troops):
                 col = cols[idx % 4]
                 with col:
-                    render_card(troop['name'], troop.get("level"), troop.get("maxLevel"), get_icon_emoji(troop['name']))
+                    render_card(troop['name'], troop.get("level"), troop.get("maxLevel"), current_tag, current_favorites, get_icon_emoji(troop['name']))
         else:
             st.info("Aucune troupe trouvée.")
 
         st.subheader("⚡ Progression des Sorts (Village Principal)")
         spells = [s for s in data.get("spells", []) if s.get("village") == "home"]
-        sorted_spells = sort_items(spells)
+        sorted_spells = sort_items(spells, current_favorites)
         
         if sorted_spells:
             spell_cols = st.columns(4)
             for idx, spell in enumerate(sorted_spells):
                 col = spell_cols[idx % 4]
                 with col:
-                    render_card(spell['name'], spell.get("level"), spell.get("maxLevel"), "🧪")
+                    render_card(spell['name'], spell.get("level"), spell.get("maxLevel"), current_tag, current_favorites, "🧪")
         else:
             st.info("Aucun sort trouvé.")
 
