@@ -78,7 +78,7 @@ def init_db():
     try:
         conn.execute("ALTER TABLE accounts ADD COLUMN active_composition TEXT DEFAULT 'Aucune'")
     except Exception:
-        pass # La colonne existe déjà
+        pass
 
     # Table des favoris
     conn.execute("""
@@ -263,7 +263,7 @@ except Exception as e:
 
 # Sélection du compte actif dans la sidebar
 accounts_list = get_all_accounts()
-account_options = {row[1]: row[0] for row in accounts_list} # {Nom: Tag}
+account_options = {row[1]: row[0] for row in accounts_list}
 
 st.sidebar.header("Gestion des Comptes")
 selected_account_name = st.sidebar.selectbox("Choisir le compte actif", list(account_options.keys()))
@@ -289,28 +289,12 @@ else:
     except Exception as e:
         st.warning(f"Could not update Turso DB: {e}")
 
-    # Récupération sécurisée de la ligue (fallback sur les trophées si Légende non inscrite ou 0)
-    league_info = data.get("league")
-    trophies = data.get("trophies", 0)
-    if league_info and isinstance(league_info, dict) and league_info.get("name"):
-        league_name = league_info.get("name")
-    else:
-        if trophies >= 5000:
-            league_name = f"Légende ({trophies} 🏆)"
-        elif trophies >= 4000:
-            league_name = f"Titan ({trophies} 🏆)"
-        elif trophies >= 3200:
-            league_name = f"Champion ({trophies} 🏆)"
-        else:
-            league_name = f"{trophies} 🏆 Trophées"
-
-    # Onglets principaux de l'application
-    tab_overview, tab_army, tab_troops, tab_config, tab_war = st.tabs([
+    # Onglets principaux (sans l'onglet War & Profil)
+    tab_overview, tab_army, tab_troops, tab_config = st.tabs([
         "📊 Vue d'ensemble", 
         "⚔️ Héros, Familiers & Équipements", 
         "🧪 Troupes, Engins & Sorts", 
-        "⚙️ Paramétrage Compositions", 
-        "🛡️ War & Profil"
+        "⚙️ Paramétrage Compositions"
     ])
 
     # -------------------------------------------------------------------
@@ -326,7 +310,6 @@ else:
         for acc in all_accs:
             p_tag, p_name, p_th, p_comp = acc[0], acc[1], acc[2], acc[3]
             
-            # Fetch pour chaque compte pour récupérer la ligue en direct
             p_data, p_err = fetch_player_data(p_tag)
             if not p_err and p_data:
                 l_info = p_data.get("league")
@@ -338,7 +321,6 @@ else:
             else:
                 l_name = "Inconnu"
             
-            # Récupération du détail de la composition active
             comp_details_text = "Aucune"
             if p_comp and p_comp != "Aucune":
                 comp_res = conn_db.execute("SELECT details FROM compositions WHERE comp_name = ?", [p_comp])
@@ -355,13 +337,6 @@ else:
             })
             
         st.dataframe(overview_data, use_container_width=True)
-        st.divider()
-        st.markdown(f"### Détails du compte actif : **{player_name}**")
-        col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Player Name", player_name)
-        col2.metric("Town Hall Level", f"TH {data.get('townHallLevel')}")
-        col3.metric("League", league_name)
-        col4.metric("War Stars", data.get("warStars"))
 
     # -------------------------------------------------------------------
     # TAB 2: HEROS, FAMILIERS & EQUIPEMENTS
@@ -506,13 +481,3 @@ else:
                 st.rerun()
         else:
             st.info("Aucune composition enregistrée pour le moment. Créez-en une ci-dessus.")
-
-    # -------------------------------------------------------------------
-    # TAB 5: WAR & PROFIL
-    # -------------------------------------------------------------------
-    with tab_war:
-        st.subheader("📊 Performances de Guerre & Profil")
-        col_w1, col_w2, col_w3 = st.columns(3)
-        col_w1.metric("Attaques gagnées", data.get('attackWins', 0))
-        col_w2.metric("Défenses gagnées", data.get('defenseWins', 0))
-        col_w3.metric("Clan", data.get('clan', {}).get('name', 'Aucun clan'))
