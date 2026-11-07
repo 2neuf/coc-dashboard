@@ -9,7 +9,6 @@ st.set_page_config(page_title="CoC Multi-Account Dashboard", layout="wide", page
 # CSS pour uniformiser les cartes et styliser les barres de progression personnalisées
 st.markdown("""
 <style>
-    /* Hauteur et dimensions strictes et égales pour toutes les cartes */
     [data-testid="stVerticalBlockBorderWrapper"] {
         background-color: #1e1e2e;
         border-radius: 10px;
@@ -20,14 +19,10 @@ st.markdown("""
         flex-direction: column;
         justify-content: space-between;
     }
-    
-    /* Style élégant pour les titres max */
     .max-title {
         color: #22c55e !important;
         font-weight: bold;
     }
-
-    /* Conteneur de la barre de progression custom */
     .custom-progress-bg {
         background-color: #313244;
         border-radius: 4px;
@@ -141,7 +136,6 @@ def fetch_player_data(player_tag: str):
             err_msg = response.text
         return None, f"Erreur API ({response.status_code}) : {err_msg}"
 
-# Listes officielles
 HERO_PETS_LIST = [
     "L.A.S.S.I", "Mighty Yak", "Electro Owl", "Unicorn", 
     "Phoenix", "Poison Lizard", "Diggy", "Frosty", 
@@ -155,6 +149,11 @@ SIEGE_MACHINES_LIST = [
 
 def get_icon_emoji(name):
     n = name.lower()
+    if "king" in n: return "👑"
+    if "queen" in n: return "👸"
+    if "warden" in n: return "🧙‍♂️"
+    if "champion" in n: return "🛡️"
+    if "minion" in n: return "🦇"
     if "dragon" in n: return "🐉"
     if "pekka" in n: return "🤖"
     if "golem" in n: return "🗿"
@@ -162,7 +161,6 @@ def get_icon_emoji(name):
     if "wizard" in n: return "🧙‍♂️"
     if "hog" in n: return "🐗"
     if "valkyrie" in n: return "🪓"
-    if "minion" in n: return "🦇"
     if "lava" in n: return "🌋"
     if "bowler" in n: return "🎳"
     if "electro" in n: return "⚡"
@@ -187,6 +185,7 @@ def get_icon_emoji(name):
     if "fox" in n: return "🦊"
     if "jelly" in n: return "🪼"
     if "blimp" in n or "slammer" in n or "flinger" in n or "launcher" in n or "barracks" in n or "drill" in n: return "🛒"
+    if "ball" in n or "gauntlet" in n or "puppet" in n or "gem" in n or "vial" in n or "spike" in n or "boots" in n or "mirror" in n or "healer" in n or "fireball" in n or "lance" in n or "rocket" in n or "clone" in n or "spiky" in n: return "🔮"
     return "⚔️"
 
 def sort_items(items, current_favorites):
@@ -343,7 +342,7 @@ else:
             hero_cols = st.columns(len(sorted_heroes))
             for idx, hero in enumerate(sorted_heroes):
                 with hero_cols[idx]:
-                    render_card(hero['name'], hero.get("level"), hero.get("maxLevel"), current_tag, current_favorites, "👑")
+                    render_card(hero['name'], hero.get("level"), hero.get("maxLevel"), current_tag, current_favorites, get_icon_emoji(hero['name']))
         else:
             st.info("Aucun héros trouvé.")
                 
@@ -369,7 +368,7 @@ else:
             for idx, eq in enumerate(sorted_eq):
                 col = eq_cols[idx % 4]
                 with col:
-                    render_card(eq['name'], eq.get("level"), eq.get("maxLevel"), current_tag, current_favorites, "🔮")
+                    render_card(eq['name'], eq.get("level"), eq.get("maxLevel"), current_tag, current_favorites, get_icon_emoji(eq['name']))
         else:
             st.info("Aucun équipement trouvé.")
 
@@ -426,7 +425,7 @@ else:
             st.info("Aucun sort trouvé.")
 
     # -------------------------------------------------------------------
-    # TAB 4: PARAMÉTRAGE DES COMPOSITIONS D'ATTAQUE
+    # TAB 4: PARAMÉTRAGE DES COMPOSITIONS D'ATTAQUE (Avec icônes et sélection directe)
     # -------------------------------------------------------------------
     with tab_config:
         st.subheader("⚙️ Paramétrage des Compositions d'Attaque")
@@ -434,36 +433,49 @@ else:
         with st.form("composition_form"):
             comp_title = st.text_input("Nom de la composition (ex: Root Rider Spam)")
             
-            st.markdown("### 👑 Sélection des Héros de la composition")
+            st.markdown("### 👑 Configuration des Héros (Familier & Équipements associés)")
             available_heroes = [h['name'] for h in data.get("heroes", []) if h.get("village") == "home"]
             available_eq = [e['name'] for e in data.get("heroEquipment", [])]
             
-            selected_heroes_comp = st.multiselect("Choisissez les héros à inclure", available_heroes)
-            
             hero_custom_links = {}
-            if selected_heroes_comp:
-                st.markdown("### 🔗 Configuration associée (Familier & Équipements)")
-                for hero in selected_heroes_comp:
-                    st.markdown(f"**👑 {hero}**")
-                    col_p, col_eq = st.columns(2)
-                    with col_p:
-                        pet_choice = st.selectbox(f"Familier pour {hero}", ["Aucun"] + HERO_PETS_LIST, key=f"pet_{hero}")
-                    with col_eq:
-                        eq_choices = st.multiselect(f"Équipements pour {hero} (max 2)", available_eq, key=f"eq_{hero}")
-                    
+            for hero in available_heroes:
+                hero_icon = get_icon_emoji(hero)
+                st.markdown(f"**{hero_icon} {hero}**")
+                
+                col_cb, col_p, col_eq = st.columns([0.2, 0.4, 0.4])
+                with col_cb:
+                    include_hero = st.checkbox("Inclure", value=True, key=f"inc_{hero}")
+                with col_p:
+                    pet_options = ["Aucun"] + HERO_PETS_LIST
+                    pet_labels = [f"{get_icon_emoji(p)} {p}" if p != "Aucun" else "🚫 Aucun" for p in pet_options]
+                    selected_pet_idx = st.selectbox(f"Familier {hero}", range(len(pet_options)), format_func=lambda x: pet_labels[x], key=f"pet_{hero}")
+                    pet_choice = pet_options[selected_pet_idx]
+                with col_eq:
+                    eq_labels = [f"{get_icon_emoji(e)} {e}" for e in available_eq]
+                    # Map pour retrouver le nom original depuis l'affichage formaté
+                    eq_map = {f"{get_icon_emoji(e)} {e}": e for e in available_eq}
+                    selected_eq_labels = st.multiselect(f"Équipements {hero} (max 2)", eq_labels, key=f"eq_{hero}")
+                    eq_choices = [eq_map[label] for label in selected_eq_labels]
+                
+                if include_hero:
                     hero_custom_links[hero] = {"pet": pet_choice, "equipment": eq_choices}
-                    st.divider()
+                st.divider()
 
             st.markdown("### 🧪 Troupes & Sorts de la Compo")
             available_troops = [t['name'] for t in raw_troops if not should_exclude(t.get("name", ""))]
-            selected_troops_comp = st.multiselect("Sélectionner les Troupes", available_troops)
+            troop_labels = [f"{get_icon_emoji(t)} {t}" for t in available_troops]
+            troop_map = {f"{get_icon_emoji(t)} {t}": t for t in available_troops}
+            selected_troop_labels = st.multiselect("Sélectionner les Troupes", troop_labels)
+            selected_troops_comp = [troop_map[l] for l in selected_troop_labels]
             
             available_spells = [s['name'] for s in spells]
-            selected_spells_comp = st.multiselect("Sélectionner les Sorts", available_spells)
+            spell_labels = [f"🧪 {s}" for s in available_spells]
+            spell_map = {f"🧪 {s}": s for s in available_spells}
+            selected_spell_labels = st.multiselect("Sélectionner les Sorts", spell_labels)
+            selected_spells_comp = [spell_map[l] for l in selected_spell_labels]
             
             submitted = st.form_submit_button("Enregistrer la composition")
             if submitted and comp_title:
-                # Validation du nombre max d'équipements par héros (maximum 2)
                 too_many_eq = False
                 for h, config in hero_custom_links.items():
                     if len(config['equipment']) > 2:
@@ -473,11 +485,14 @@ else:
                 if not too_many_eq:
                     heroes_summary_list = []
                     for h, config in hero_custom_links.items():
-                        pets_str = f"Pet: {config['pet']}" if config['pet'] != "Aucun" else "Pet: Aucun"
-                        eq_str = f"Équipements: {', '.join(config['equipment'])}" if config['equipment'] else "Équipements: Aucun"
-                        heroes_summary_list.append(f"{h} ({pets_str} | {eq_str})")
+                        pet_display = f"{get_icon_emoji(config['pet'])} {config['pet']}" if config['pet'] != "Aucun" else "Aucun"
+                        eq_display = ", ".join([f"{get_icon_emoji(e)} {e}" for e in config['equipment']]) if config['equipment'] else "Aucun"
+                        heroes_summary_list.append(f"{get_icon_emoji(h)} {h} (Pet: {pet_display} | Équipements: {eq_display})")
 
-                    comp_details = f"Héros -> {' / '.join(heroes_summary_list) if heroes_summary_list else 'Aucun'} | Troupes: {', '.join(selected_troops_comp)} | Sorts: {', '.join(selected_spells_comp)}"
+                    troops_display = ", ".join([f"{get_icon_emoji(t)} {t}" for t in selected_troops_comp]) if selected_troops_comp else "Aucune"
+                    spells_display = ", ".join([f"🧪 {s}" for s in selected_spells_comp]) if selected_spells_comp else "Aucun"
+
+                    comp_details = f"Héros -> {' / '.join(heroes_summary_list) if heroes_summary_list else 'Aucun'} | Troupes: {troops_display} | Sorts: {spells_display}"
                     
                     conn = get_db_client()
                     conn.execute("INSERT OR REPLACE INTO compositions (comp_name, details) VALUES (?, ?)", [comp_title, comp_details])
