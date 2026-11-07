@@ -36,13 +36,11 @@ st.markdown("""
         margin-top: 6px;
         overflow: hidden;
     }
-    /* Remplissage bleu (normal) */
     .custom-progress-fill-blue {
         background-color: #3b82f6;
         height: 100%;
         border-radius: 4px;
     }
-    /* Remplissage vert (max) */
     .custom-progress-fill-green {
         background-color: #22c55e;
         height: 100%;
@@ -67,14 +65,17 @@ def get_db_client():
 
 def init_db():
     conn = get_db_client()
+    # Table des comptes
     conn.execute("""
         CREATE TABLE IF NOT EXISTS accounts (
             player_tag TEXT PRIMARY KEY,
             name TEXT,
             town_hall INTEGER,
-            gold_pass_boost INTEGER DEFAULT 0
+            gold_pass_boost INTEGER DEFAULT 0,
+            active_composition TEXT DEFAULT 'Aucune'
         )
     """)
+    # Table des favoris
     conn.execute("""
         CREATE TABLE IF NOT EXISTS favorites (
             player_tag TEXT,
@@ -82,7 +83,15 @@ def init_db():
             PRIMARY KEY (player_tag, item_name)
         )
     """)
+    # Table des compositions d'attaque personnalisées
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS compositions (
+            comp_name TEXT PRIMARY KEY,
+            details TEXT
+        )
+    """)
     
+    # Insertion de test pour "Mini"
     conn.execute("""
         INSERT OR IGNORE INTO accounts (player_tag, name, town_hall) 
         VALUES (?, ?, ?)
@@ -100,6 +109,15 @@ def add_db_favorite(player_tag, item_name):
 def remove_db_favorite(player_tag, item_name):
     conn = get_db_client()
     conn.execute("DELETE FROM favorites WHERE player_tag = ? AND item_name = ?", [player_tag, item_name])
+
+def get_all_accounts():
+    conn = get_db_client()
+    res = conn.execute("SELECT player_tag, name, town_hall, active_composition FROM accounts")
+    return res.rows
+
+def update_account_composition(player_tag, comp_name):
+    conn = get_db_client()
+    conn.execute("UPDATE accounts SET active_composition = ? WHERE player_tag = ?", [comp_name, player_tag])
 
 def fetch_player_data(player_tag: str):
     clean_tag = player_tag.strip().upper()
@@ -123,14 +141,13 @@ def fetch_player_data(player_tag: str):
             err_msg = response.text
         return None, f"Erreur API ({response.status_code}) : {err_msg}"
 
-# Liste officielle des familiers (avec Sneezy)
+# Listes officielles
 HERO_PETS_LIST = [
     "L.A.S.S.I", "Mighty Yak", "Electro Owl", "Unicorn", 
     "Phoenix", "Poison Lizard", "Diggy", "Frosty", 
     "Spirit Fox", "Angry Jelly", "Sneezy"
 ]
 
-# Liste officielle des engins de siège
 SIEGE_MACHINES_LIST = [
     "Wall Wreck", "Battle Blimp", "Stone Slammer", 
     "Siege Barracks", "Log Launcher", "Flame Flinger", "Battle Drill"
@@ -208,7 +225,7 @@ def render_card(name, lvl, max_lvl, current_tag, current_favorites, icon="⚔️
             else:
                 st.markdown(f"**{icon} {name}**")
         with col_btn:
-            if st.button(fav_icon, key=f"fav_btn_{name}", help="Favori"):
+            if st.button(fav_icon, key=f"fav_btn_{name}_{current_tag}", help="Favori"):
                 if is_fav:
                     remove_db_favorite(current_tag, name)
                 else:
@@ -229,9 +246,9 @@ def render_card(name, lvl, max_lvl, current_tag, current_favorites, icon="⚔️
         st.markdown(bar_html, unsafe_allow_html=True)
 
 # -------------------------------------------------------------------
-# 2. APP LAYOUT
+# 2. APP LAYOUT & NAVIGATION
 # -------------------------------------------------------------------
-st.title("🛡️ Clash of Clans Dashboard — MVP")
+st.title("🛡️ Clash of Clans Dashboard — Multi-Comptes")
 
 try:
     init_db()
@@ -239,10 +256,15 @@ try:
 except Exception as e:
     st.sidebar.error(f"❌ DB Error: {e}")
 
-current_tag = "#YJ0U9P89V"
-player_name = "Mini"
+# Sélection du compte actif dans la sidebar
+accounts_list = get_all_accounts()
+account_options = {row[1]: row[0] for row in accounts_list} # {Nom: Tag}
 
-st.sidebar.header("Account Active")
+st.sidebar.header("Gestion des Comptes")
+selected_account_name = st.sidebar.selectbox("Choisir le compte actif", list(account_options.keys()))
+current_tag = account_options[selected_account_name]
+player_name = selected_account_name
+
 st.sidebar.info(f"Pseudo : **{player_name}**\nTag : **{current_tag}**")
 
 current_favorites = get_db_favorites(current_tag)
@@ -256,25 +278,75 @@ else:
     try:
         conn = get_db_client()
         conn.execute(
-            "INSERT OR REPLACE INTO accounts (player_tag, name, town_hall) VALUES (?, ?, ?)",
-            [data["tag"], player_name, data["townHallLevel"]]
+            "INSERT OR REPLACE INTO accounts (player_tag, name, town_hall, active_composition) VALUES (?, ?, ?, COALESCE((SELECT active_composition FROM accounts WHERE player_tag = ?), 'Aucune'))",
+            [data["tag"], player_name, data["townHallLevel"], data["tag"]]
         )
     except Exception as e:
         st.warning(f"Could not update Turso DB: {e}")
 
-    # Récupération sécurisée du nom de la ligue (parfois absent si non classé)
-    league_name = data.get("league", {}).get("name", "Non classé")
+    # Récupération sécurisée de la ligue (avec fallback trophées si Légende non inscrite)
+    league_info = data.get("league")
+    if league_info and isinstance(league_info, dict):
+        league_name = league_info.get("name", "Non classé")
+    else:
+        trophies = data.get("trophies", 0)
+        if trophies >= 5000:
+            league_name = f"Légende ({trophies} 🏆)"
+        elif trophies >= 4000:
+            league_name = f"Titan ({trophies} 🏆)"
+        elif trophies >= 3200:
+            league_name = f"Champion ({trophies} 🏆)"
+        else:
+            league_name = f"{trophies} 🏆 Trophées"
 
-    col1, col2, col3, col4 = st.columns(4)
-    col1.metric("Player Name", player_name)
-    col2.metric("Town Hall Level", f"TH {data.get('townHallLevel')}")
-    col3.metric("League", league_name)
-    col4.metric("War Stars", data.get("warStars"))
+    # Onglets principaux de l'application
+    tab_overview, tab_army, tab_troops, tab_config, tab_war = st.tabs([
+        "📊 Vue d'ensemble", 
+        "⚔️ Héros, Familiers & Équipements", 
+        "🧪 Troupes, Engins & Sorts", 
+        "⚙️ Paramétrage Compositions", 
+        "🛡️ War & Profil"
+    ])
 
-    st.divider()
+    # -------------------------------------------------------------------
+    # TAB 1: VUE D'ENSEMBLE MULTI-COMPTES
+    # -------------------------------------------------------------------
+    with tab_overview:
+        st.subheader("📊 Vue d'ensemble de tous les joueurs")
+        
+        all_accs = get_all_accounts()
+        overview_data = []
+        
+        for acc in all_accs:
+            p_tag, p_name, p_th, p_comp = acc[0], acc[1], acc[2], acc[3]
+            # Fetch rapide pour chaque compte pour récupérer la ligue et les infos en direct
+            p_data, p_err = fetch_player_data(p_tag)
+            if not p_err and p_data:
+                l_info = p_data.get("league")
+                l_name = l_info.get("name", "Non classé") if (l_info and isinstance(l_info, dict)) else f"{p_data.get('trophies', 0)} 🏆"
+            else:
+                l_name = "Inconnu"
+            
+            overview_data.append({
+                "Pseudo": p_name,
+                "HDV": f"TH {p_th}",
+                "Ligue": l_name,
+                "Composition d'attaque": p_comp,
+                "Tag": p_tag
+            })
+            
+        st.dataframe(overview_data, use_container_width=True)
+        st.divider()
+        st.markdown(f"### Détails du compte actif : **{player_name}**")
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Player Name", player_name)
+        col2.metric("Town Hall Level", f"TH {data.get('townHallLevel')}")
+        col3.metric("League", league_name)
+        col4.metric("War Stars", data.get("warStars"))
 
-    tab_army, tab_troops, tab_war = st.tabs(["⚔️ Héros, Familiers & Équipements", "🧪 Troupes & Sorts", "🛡️ War & Profil"])
-
+    # -------------------------------------------------------------------
+    # TAB 2: HEROS, FAMILIERS & EQUIPEMENTS
+    # -------------------------------------------------------------------
     with tab_army:
         st.subheader("👑 Héros")
         heroes = data.get("heroes", [])
@@ -314,6 +386,9 @@ else:
         else:
             st.info("Aucun équipement trouvé.")
 
+    # -------------------------------------------------------------------
+    # TAB 3: TROUPES, ENGINS & SORTS
+    # -------------------------------------------------------------------
     with tab_troops:
         st.subheader("🧪 Progression des Troupes (Village Principal)")
         raw_troops = [t for t in data.get("troops", []) if t.get("village") == "home"]
@@ -363,6 +438,60 @@ else:
         else:
             st.info("Aucun sort trouvé.")
 
+    # -------------------------------------------------------------------
+    # TAB 4: PARAMÉTRAGE DES COMPOSITIONS D'ATTAQUE
+    # -------------------------------------------------------------------
+    with tab_config:
+        st.subheader("⚙️ Paramétrage des Compositions d'Attaque")
+        
+        with st.form("composition_form"):
+            comp_title = st.text_input("Nom de la composition (ex: Root Rider Spam)")
+            
+            st.markdown("### Sélection des Éléments de la Compo")
+            # Listes déroulantes pour configurer la compo
+            available_heroes = [h['name'] for h in data.get("heroes", []) if h.get("village") == "home"]
+            selected_heroes_comp = st.multiselect("Sélectionner les Héros", available_heroes)
+            
+            selected_pets_comp = st.multiselect("Sélectionner les Familiers", HERO_PETS_LIST)
+            
+            available_eq = [e['name'] for e in data.get("heroEquipment", [])]
+            selected_eq_comp = st.multiselect("Sélectionner les Équipements", available_eq)
+            
+            available_troops = [t['name'] for t in raw_troops if not should_exclude(t.get("name", ""))]
+            selected_troops_comp = st.multiselect("Sélectionner les Troupes", available_troops)
+            
+            available_spells = [s['name'] for s in spells]
+            selected_spells_comp = st.multiselect("Sélectionner les Sorts", available_spells)
+            
+            submitted = st.form_submit_button("Enregistrer la composition")
+            if submitted and comp_title:
+                comp_details = f"Héros: {', '.join(selected_heroes_comp)} | Familiers: {', '.join(selected_pets_comp)} | Équipements: {', '.join(selected_eq_comp)} | Troupes: {', '.join(selected_troops_comp)} | Sorts: {', '.join(selected_spells_comp)}"
+                conn = get_db_client()
+                conn.execute("INSERT OR REPLACE INTO compositions (comp_name, details) VALUES (?, ?)", [comp_title, comp_details])
+                st.success(f"Composition '{comp_title}' enregistrée avec succès !")
+                st.rerun()
+
+        st.divider()
+        st.subheader("🎯 Assigner une composition au joueur actif")
+        
+        conn = get_db_client()
+        comps_res = conn.execute("SELECT comp_name FROM compositions")
+        all_comps = [row[0] for row in comps_res.rows]
+        
+        if all_comps:
+            current_assigned = conn.execute("SELECT active_composition FROM accounts WHERE player_tag = ?", [current_tag]).rows[0][0]
+            selected_comp = st.selectbox("Choisir la compo pour ce joueur", all_comps, index=all_comps.index(current_assigned) if current_assigned in all_comps else 0)
+            
+            if st.button("Sauvegarder l'association pour ce compte"):
+                update_account_composition(current_tag, selected_comp)
+                st.success(f"Composition '{selected_comp}' assignée à {player_name} !")
+                st.rerun()
+        else:
+            st.info("Aucune composition enregistrée pour le moment. Créez-en une ci-dessus.")
+
+    # -------------------------------------------------------------------
+    # TAB 5: WAR & PROFIL
+    # -------------------------------------------------------------------
     with tab_war:
         st.subheader("📊 Performances de Guerre & Profil")
         col_w1, col_w2, col_w3 = st.columns(3)
