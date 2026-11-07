@@ -92,13 +92,12 @@ else:
 
     st.divider()
 
-    # Tabs Layout (Sans l'onglet farm, recentré sur l'armée, les troupes/sorts et la guerre)
-    tab_army, tab_troops, tab_war = st.tabs(["⚔️ Héros & Équipements", "🧪 Troupes & Sorts", "🛡️ War & Profil"])
+    # Tabs Layout
+    tab_army, tab_troops, tab_war = st.tabs(["⚔️ Héros, Familiers & Équipements", "🧪 Troupes & Sorts", "🛡️ War & Profil"])
 
     with tab_army:
         st.subheader("Héros")
         heroes = data.get("heroes", [])
-        # Filtrer uniquement le village principal si besoin, ou tout afficher
         home_heroes = [h for h in heroes if h.get("village") == "home"]
         if home_heroes:
             hero_cols = st.columns(len(home_heroes))
@@ -108,6 +107,23 @@ else:
         else:
             st.info("Aucun héros trouvé.")
                 
+        st.subheader("Familiers de Héros (Pets)")
+        pets = data.get("heroPets", [])
+        if pets:
+            pet_cols = st.columns(min(4, len(pets)))
+            for idx, pet in enumerate(pets):
+                col_idx = idx % 4
+                lvl = pet.get("level")
+                max_lvl = pet.get("maxLevel")
+                remaining = max_lvl - lvl
+                with pet_cols[col_idx]:
+                    if remaining == 0:
+                        st.success(f"**{pet['name']}**\n\nMax ({lvl}/{max_lvl}) ✨")
+                    else:
+                        st.info(f"**{pet['name']}**\n\nNiveau {lvl} / {max_lvl}\n*(Reste {remaining} niv.)*")
+        else:
+            st.info("Aucun familier trouvé.")
+
         st.subheader("Équipements de Héros")
         equipment = data.get("heroEquipment", [])
         if equipment:
@@ -120,16 +136,21 @@ else:
 
     with tab_troops:
         st.subheader("Progression des Troupes (Village Principal)")
-        troops = [t for t in data.get("troops", []) if t.get("village") == "home"]
+        raw_troops = [t for t in data.get("troops", []) if t.get("village") == "home"]
+        
+        # Filtrage pour exclure les super troupes
+        def is_super_troop(name):
+            name_lower = name.lower()
+            return "super" in name_lower or name in ["Sneaky Goblin", "Rocket Balloon", "Inferno Dragon"]
+        
+        troops = [t for t in raw_troops if not is_super_troop(t.get("name", ""))]
         
         if troops:
-            # Affichage sous forme de grille compacte
             cols = st.columns(4)
             for idx, troop in enumerate(troops):
                 col = cols[idx % 4]
                 lvl = troop.get("level")
                 max_lvl = troop.get("maxLevel")
-                # Calcul des niveaux restants
                 remaining = max_lvl - lvl
                 
                 with col:
@@ -145,22 +166,4 @@ else:
         
         if spells:
             spell_cols = st.columns(4)
-            for idx, spell in enumerate(spells):
-                col = spell_cols[idx % 4]
-                lvl = spell.get("level")
-                max_lvl = spell.get("maxLevel")
-                remaining = max_lvl - lvl
-                
-                with col:
-                    if remaining == 0:
-                        st.success(f"**{spell['name']}**\n\nMax ({lvl}/{max_lvl}) ✨")
-                    else:
-                        st.info(f"**{spell['name']}**\n\nNiveau {lvl} / {max_lvl}\n*(Reste {remaining} niv.)*")
-        else:
-            st.info("Aucun sort trouvé.")
-
-    with tab_war:
-        st.subheader("Performances de Guerre")
-        st.write(f"**Attaques gagnées:** {data.get('attackWins', 0)}")
-        st.write(f"**Défenses gagnées:** {data.get('defenseWins', 0)}")
-        st.write(f"**Clan:** {data.get('clan', {}).get('name', 'Aucun clan')}")
+            for idx
