@@ -147,7 +147,7 @@ SIEGE_MACHINES_LIST = [
     "Siege Barracks", "Log Launcher", "Flame Flinger", "Battle Drill"
 ]
 
-# Dictionnaire de correspondance officiel des équipements par Héros (Noms API / Anglais vers Français)
+# Dictionnaire complet et officiel des équipements par Héros
 HERO_EQUIPMENT_MAPPING = {
     "Barbarian King": [
         "Giant Gauntlet", "Barbarian Puppet", "Earthquake Boots", 
@@ -402,7 +402,7 @@ else:
     # -------------------------------------------------------------------
     with tab_troops:
         st.subheader("🧪 Progression des Troupes (Village Principal)")
-        raw_troops = [t for t in data.get("troops", []) if t.get("village") == "home"]
+        raw_troops = [t for t in data.get("troops", []) if t.get("village"] == "home"]
         
         def should_exclude(name):
             name_lower = name.lower()
@@ -437,7 +437,7 @@ else:
             st.info("Aucun engin de siège trouvé.")
 
         st.subheader("⚡ Progression des Sorts (Village Principal)")
-        spells = [s for s in data.get("spells", []) if s.get("village") == "home"]
+        spells = [s for s in data.get("spells", []) if s.get("village"] == "home"]
         sorted_spells = sort_items(spells, current_favorites)
         
         if sorted_spells:
@@ -450,7 +450,7 @@ else:
             st.info("Aucun sort trouvé.")
 
     # -------------------------------------------------------------------
-    # TAB 4: PARAMÉTRAGE DES COMPOSITIONS D'ATTAQUE (Filtrage par Héros spécifique)
+    # TAB 4: PARAMÉTRAGE DES COMPOSITIONS D'ATTAQUE (Équipements par Héros garantis)
     # -------------------------------------------------------------------
     with tab_config:
         st.subheader("⚙️ Paramétrage des Compositions d'Attaque")
@@ -458,7 +458,7 @@ else:
         comp_title = st.text_input("Nom de la composition (ex: Root Rider Spam)")
         
         st.markdown("### 👑 Sélection des Héros")
-        available_heroes = [h['name'] for h in data.get("heroes", []) if h.get("village") == "home"]
+        available_heroes = [h['name'] for h in data.get("heroes", []) if h.get("village"] == "home"]
             
         hero_labels = [f"{get_icon_emoji(h)} {h}" for h in available_heroes]
         hero_map = {f"{get_icon_emoji(h)} {h}": h for h in available_heroes}
@@ -466,10 +466,7 @@ else:
         selected_hero_labels = st.multiselect("Choisissez les héros à inclure", hero_labels, key="hero_multiselect")
         selected_heroes_comp = [hero_map[l] for l in selected_hero_labels]
         
-        player_equipment_names = [e['name'] for e in data.get("heroEquipment", [])]
-        
         hero_custom_links = {}
-        missing_equipments_heroes = []
 
         if selected_heroes_comp:
             st.markdown("---")
@@ -487,13 +484,8 @@ else:
                     pet_choice = pet_options[selected_pet_idx]
                 
                 with col_eq:
-                    # Filtrer uniquement les équipements valides pour ce héros spécifique depuis notre dictionnaire
-                    allowed_eqs_for_hero = HERO_EQUIPMENT_MAPPING.get(hero, [])
-                    # Ne garder que ceux que le joueur possède réellement
-                    hero_specific_eqs = [e for e in player_equipment_names if e in allowed_eqs_for_hero]
-                    
-                    if not hero_specific_eqs:
-                        hero_specific_eqs = player_equipment_names # Fallback si correspondance introuvable
+                    # Utiliser directement la liste officielle du dictionnaire pour ce héros (pour ne rien rater !)
+                    hero_specific_eqs = HERO_EQUIPMENT_MAPPING.get(hero, [e['name'] for e in data.get("heroEquipment", [])])
                     
                     eq_labels = [f"{get_icon_emoji(e)} {e}" for e in hero_specific_eqs]
                     eq_map = {f"{get_icon_emoji(e)} {e}": e for e in hero_specific_eqs}
@@ -501,16 +493,12 @@ else:
                     selected_eq_labels = st.multiselect(f"Équipements pour {hero} (max 2)", eq_labels, key=f"eq_{hero}")
                     eq_choices = [eq_map[label] for label in selected_eq_labels]
                     
-                    # Vérification si des équipements n'ont pas été renseignés pour ce héros
+                    # Message d'invitation/alerte immédiat sous le champ si aucun équipement n'est sélectionné
                     if not eq_choices:
-                        missing_equipments_heroes.append(hero)
+                        st.warning(f"⚠️ Veuillez joindre et sélectionner les équipements de **{hero}** (maximum 2).")
                 
                 hero_custom_links[hero] = {"pet": pet_choice, "equipment": eq_choices}
                 st.divider()
-
-        # Alerte si l'utilisateur n'a pas renseigné d'équipements pour certains héros actifs
-        if missing_equipments_heroes:
-            st.warning(f"⚠️ **Attention :** Vous n'avez sélectionné aucun équipement pour : **{', '.join(missing_equipments_heroes)}**. Pensez à les joindre ci-dessus pour compléter votre configuration.")
 
         st.markdown("### 🧪 Troupes & Sorts de la Compo")
         available_troops = [t['name'] for t in raw_troops if not should_exclude(t.get("name", ""))]
