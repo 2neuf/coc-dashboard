@@ -146,19 +146,33 @@ def get_icon_emoji(name):
 
 def sort_items(items):
     """
-    Règle de tri :
-    1. Favoris en premier (qu'ils soient max ou non).
-    2. Non-favoris en cours de progression (niveau < max).
-    3. Cartes MAX non-favoris à la toute fin.
+    Règle de tri globale :
+    1. Statut favori prioritaire absolu.
+       - Entre favoris : tri par plus petite différence de niveaux (max favoris à la fin des favoris).
+    2. Pour les non-favoris :
+       - D'abord les éléments en cours de progression (triés par plus petite différence de niveau en premier, puis plus grosse différence).
+       - Enfin les éléments MAX à la toute fin.
     """
+    def get_diff(item):
+        lvl = item.get('level', 0)
+        max_lvl = item.get('maxLevel', 0)
+        return max_lvl - lvl
+
+    # Séparation favoris / non-favoris
     favs = [i for i in items if i.get('name') in st.session_state.favorites]
     non_favs = [i for i in items if i.get('name') not in st.session_state.favorites]
     
-    # Parmi les non-favoris, on sépare ceux qui sont max de ceux qui ne le sont pas
-    active_non_favs = [i for i in non_favs if i.get('level', 0) < i.get('maxLevel', 0)]
-    max_non_favs = [i for i in non_favs if i.get('level', 0) >= i.get('maxLevel', 0)]
+    # Tri des favoris : actifs par différence croissante, puis les max favoris
+    active_favs = sorted([i for i in favs if get_diff(i) > 0], key=get_diff)
+    max_favs = [i for i in favs if get_diff(i) == 0]
+    sorted_favs = active_favs + max_favs
     
-    return favs + active_non_favs + max_non_favs
+    # Tri des non-favoris : actifs par différence croissante, puis les max non-favoris
+    active_non_favs = sorted([i for i in non_favs if get_diff(i) > 0], key=get_diff)
+    max_non_favs = [i for i in non_favs if get_diff(i) == 0]
+    sorted_non_favs = active_non_favs + max_non_favs
+    
+    return sorted_favs + sorted_non_favs
 
 def render_card(name, lvl, max_lvl, icon="⚔️"):
     remaining = max_lvl - lvl
