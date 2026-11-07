@@ -329,7 +329,7 @@ else:
                 "Composition d'attaque": comp_details_text
             })
             
-        st.dataframe(overview_data, use_container_width=True)
+        st.dataframe(overview_data, width='stretch')
 
     # -------------------------------------------------------------------
     # TAB 2: HEROS, FAMILIERS & EQUIPEMENTS
@@ -426,7 +426,7 @@ else:
             st.info("Aucun sort trouvé.")
 
     # -------------------------------------------------------------------
-    # TAB 4: PARAMÉTRAGE DES COMPOSITIONS D'ATTAQUE (Configuration directe par Héros)
+    # TAB 4: PARAMÉTRAGE DES COMPOSITIONS D'ATTAQUE
     # -------------------------------------------------------------------
     with tab_config:
         st.subheader("⚙️ Paramétrage des Compositions d'Attaque")
@@ -434,24 +434,25 @@ else:
         with st.form("composition_form"):
             comp_title = st.text_input("Nom de la composition (ex: Root Rider Spam)")
             
-            st.markdown("### 👑 Configuration des Héros (Familier & 2 Équipements par Héros)")
+            st.markdown("### 👑 Sélection des Héros de la composition")
             available_heroes = [h['name'] for h in data.get("heroes", []) if h.get("village") == "home"]
             available_eq = [e['name'] for e in data.get("heroEquipment", [])]
             
+            selected_heroes_comp = st.multiselect("Choisissez les héros à inclure", available_heroes)
+            
             hero_custom_links = {}
-            for hero in available_heroes:
-                st.markdown(f"**👑 {hero}**")
-                col_cb, col_p, col_eq = st.columns([0.2, 0.4, 0.4])
-                with col_cb:
-                    include_hero = st.checkbox(f"Inclure", value=True, key=f"inc_{hero}")
-                with col_p:
-                    pet_choice = st.selectbox(f"Familier", ["Aucun"] + HERO_PETS_LIST, key=f"pet_{hero}")
-                with col_eq:
-                    eq_choices = st.multiselect(f"2 Équipements (max 2)", available_eq, max_selected_values=2, key=f"eq_{hero}")
-                
-                if include_hero:
+            if selected_heroes_comp:
+                st.markdown("### 🔗 Configuration associée (Familier & Équipements)")
+                for hero in selected_heroes_comp:
+                    st.markdown(f"**👑 {hero}**")
+                    col_p, col_eq = st.columns(2)
+                    with col_p:
+                        pet_choice = st.selectbox(f"Familier pour {hero}", ["Aucun"] + HERO_PETS_LIST, key=f"pet_{hero}")
+                    with col_eq:
+                        eq_choices = st.multiselect(f"Équipements pour {hero} (max 2)", available_eq, key=f"eq_{hero}")
+                    
                     hero_custom_links[hero] = {"pet": pet_choice, "equipment": eq_choices}
-                st.divider()
+                    st.divider()
 
             st.markdown("### 🧪 Troupes & Sorts de la Compo")
             available_troops = [t['name'] for t in raw_troops if not should_exclude(t.get("name", ""))]
@@ -462,18 +463,26 @@ else:
             
             submitted = st.form_submit_button("Enregistrer la composition")
             if submitted and comp_title:
-                heroes_summary_list = []
+                # Validation du nombre max d'équipements par héros (maximum 2)
+                too_many_eq = False
                 for h, config in hero_custom_links.items():
-                    pets_str = f"Pet: {config['pet']}" if config['pet'] != "Aucun" else "Pet: Aucun"
-                    eq_str = f"Équipements: {', '.join(config['equipment'])}" if config['equipment'] else "Équipements: Aucun"
-                    heroes_summary_list.append(f"{h} ({pets_str} | {eq_str})")
-
-                comp_details = f"Héros -> {' / '.join(heroes_summary_list)} | Troupes: {', '.join(selected_troops_comp)} | Sorts: {', '.join(selected_spells_comp)}"
+                    if len(config['equipment']) > 2:
+                        too_many_eq = True
+                        st.error(f"❌ Le héros {h} possède plus de 2 équipements sélectionnés (maximum 2 autorisés).")
                 
-                conn = get_db_client()
-                conn.execute("INSERT OR REPLACE INTO compositions (comp_name, details) VALUES (?, ?)", [comp_title, comp_details])
-                st.success(f"Composition '{comp_title}' enregistrée avec succès !")
-                st.rerun()
+                if not too_many_eq:
+                    heroes_summary_list = []
+                    for h, config in hero_custom_links.items():
+                        pets_str = f"Pet: {config['pet']}" if config['pet'] != "Aucun" else "Pet: Aucun"
+                        eq_str = f"Équipements: {', '.join(config['equipment'])}" if config['equipment'] else "Équipements: Aucun"
+                        heroes_summary_list.append(f"{h} ({pets_str} | {eq_str})")
+
+                    comp_details = f"Héros -> {' / '.join(heroes_summary_list) if heroes_summary_list else 'Aucun'} | Troupes: {', '.join(selected_troops_comp)} | Sorts: {', '.join(selected_spells_comp)}"
+                    
+                    conn = get_db_client()
+                    conn.execute("INSERT OR REPLACE INTO compositions (comp_name, details) VALUES (?, ?)", [comp_title, comp_details])
+                    st.success(f"Composition '{comp_title}' enregistrée avec succès !")
+                    st.rerun()
 
         st.divider()
         st.subheader("🎯 Assigner une composition au joueur actif")
