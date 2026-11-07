@@ -147,6 +147,31 @@ SIEGE_MACHINES_LIST = [
     "Siege Barracks", "Log Launcher", "Flame Flinger", "Battle Drill"
 ]
 
+# Dictionnaire de correspondance officiel des équipements par Héros (Noms API / Anglais vers Français)
+HERO_EQUIPMENT_MAPPING = {
+    "Barbarian King": [
+        "Giant Gauntlet", "Barbarian Puppet", "Earthquake Boots", 
+        "Rage Vial", "Vambrace", "Spiky Ball"
+    ],
+    "Archer Queen": [
+        "Giant Arrow", "Archer Puppet", "Invisibility Vial", 
+        "Healer Puppet", "Magic Mirror", "Frozen Arrow"
+    ],
+    "Grand Warden": [
+        "Life Gem", "Eternal Tome", "Healing Tome", "Fireball", "Lavaloon Puppet"
+    ],
+    "Royal Champion": [
+        "Seeking Shield", "Hog Rider Puppet", "Haste Vial", 
+        "Royal Gem", "Rocket Spear", "Electro Boots"
+    ],
+    "Minion Prince": [
+        "Protector Puppet", "Henchman Pants", "Dark Orb", "Meteor Staff", "Dark Crown"
+    ],
+    "Dragon Duke": [
+        "Fire Heart", "Blowtorch", "Electro Fang", "Jetpack", "Card Deck"
+    ]
+}
+
 def get_icon_emoji(name):
     n = name.lower()
     if "king" in n: return "👑"
@@ -185,7 +210,7 @@ def get_icon_emoji(name):
     if "fox" in n: return "🦊"
     if "jelly" in n: return "🪼"
     if "blimp" in n or "slammer" in n or "flinger" in n or "launcher" in n or "barracks" in n or "drill" in n: return "🛒"
-    if "ball" in n or "gauntlet" in n or "puppet" in n or "gem" in n or "vial" in n or "spike" in n or "boots" in n or "mirror" in n or "healer" in n or "fireball" in n or "lance" in n or "rocket" in n or "clone" in n or "spiky" in n: return "🔮"
+    if "ball" in n or "gauntlet" in n or "puppet" in n or "gem" in n or "vial" in n or "spike" in n or "boots" in n or "mirror" in n or "fireball" in n or "lance" in n or "rocket" in n or "tome" in n: return "🔮"
     return "⚔️"
 
 def sort_items(items, current_favorites):
@@ -425,7 +450,7 @@ else:
             st.info("Aucun sort trouvé.")
 
     # -------------------------------------------------------------------
-    # TAB 4: PARAMÉTRAGE DES COMPOSITIONS D'ATTAQUE (Tous les héros disponibles)
+    # TAB 4: PARAMÉTRAGE DES COMPOSITIONS D'ATTAQUE (Filtrage par Héros spécifique)
     # -------------------------------------------------------------------
     with tab_config:
         st.subheader("⚙️ Paramétrage des Compositions d'Attaque")
@@ -433,7 +458,6 @@ else:
         comp_title = st.text_input("Nom de la composition (ex: Root Rider Spam)")
         
         st.markdown("### 👑 Sélection des Héros")
-        # Récupère tous les héros du village principal du joueur (jusqu'à ses 6 héros)
         available_heroes = [h['name'] for h in data.get("heroes", []) if h.get("village") == "home"]
             
         hero_labels = [f"{get_icon_emoji(h)} {h}" for h in available_heroes]
@@ -442,11 +466,14 @@ else:
         selected_hero_labels = st.multiselect("Choisissez les héros à inclure", hero_labels, key="hero_multiselect")
         selected_heroes_comp = [hero_map[l] for l in selected_hero_labels]
         
+        player_equipment_names = [e['name'] for e in data.get("heroEquipment", [])]
+        
         hero_custom_links = {}
+        missing_equipments_heroes = []
+
         if selected_heroes_comp:
             st.markdown("---")
             st.markdown("### 🔗 Configuration des Héros sélectionnés (Familier & Équipements)")
-            available_eq = [e['name'] for e in data.get("heroEquipment", [])]
             
             for hero in selected_heroes_comp:
                 hero_icon = get_icon_emoji(hero)
@@ -458,14 +485,32 @@ else:
                     pet_labels = [f"{get_icon_emoji(p)} {p}" if p != "Aucun" else "🚫 Aucun" for p in pet_options]
                     selected_pet_idx = st.selectbox(f"Familier pour {hero}", range(len(pet_options)), format_func=lambda x: pet_labels[x], key=f"pet_{hero}")
                     pet_choice = pet_options[selected_pet_idx]
+                
                 with col_eq:
-                    eq_labels = [f"{get_icon_emoji(e)} {e}" for e in available_eq]
-                    eq_map = {f"{get_icon_emoji(e)} {e}": e for e in available_eq}
+                    # Filtrer uniquement les équipements valides pour ce héros spécifique depuis notre dictionnaire
+                    allowed_eqs_for_hero = HERO_EQUIPMENT_MAPPING.get(hero, [])
+                    # Ne garder que ceux que le joueur possède réellement
+                    hero_specific_eqs = [e for e in player_equipment_names if e in allowed_eqs_for_hero]
+                    
+                    if not hero_specific_eqs:
+                        hero_specific_eqs = player_equipment_names # Fallback si correspondance introuvable
+                    
+                    eq_labels = [f"{get_icon_emoji(e)} {e}" for e in hero_specific_eqs]
+                    eq_map = {f"{get_icon_emoji(e)} {e}": e for e in hero_specific_eqs}
+                    
                     selected_eq_labels = st.multiselect(f"Équipements pour {hero} (max 2)", eq_labels, key=f"eq_{hero}")
                     eq_choices = [eq_map[label] for label in selected_eq_labels]
+                    
+                    # Vérification si des équipements n'ont pas été renseignés pour ce héros
+                    if not eq_choices:
+                        missing_equipments_heroes.append(hero)
                 
                 hero_custom_links[hero] = {"pet": pet_choice, "equipment": eq_choices}
                 st.divider()
+
+        # Alerte si l'utilisateur n'a pas renseigné d'équipements pour certains héros actifs
+        if missing_equipments_heroes:
+            st.warning(f"⚠️ **Attention :** Vous n'avez sélectionné aucun équipement pour : **{', '.join(missing_equipments_heroes)}**. Pensez à les joindre ci-dessus pour compléter votre configuration.")
 
         st.markdown("### 🧪 Troupes & Sorts de la Compo")
         available_troops = [t['name'] for t in raw_troops if not should_exclude(t.get("name", ""))]
@@ -494,7 +539,7 @@ else:
                     heroes_summary_list = []
                     for h, config in hero_custom_links.items():
                         pet_display = f"{get_icon_emoji(config['pet'])} {config['pet']}" if config['pet'] != "Aucun" else "Aucun"
-                        eq_display = ", ".join([f"{get_icon_emoji(e)} {e}" for e in config['equipment']]) if config['equipment'] else "Aucun"
+                        eq_display = ", ".join([f"{get_icon_emoji(e)} {e}" for e in config['equipment']]) if config['equipment'] else "Aucun (À renseigner)"
                         heroes_summary_list.append(f"{get_icon_emoji(h)} {h} (Pet: {pet_display} | Équipements: {eq_display})")
 
                     troops_display = ", ".join([f"{get_icon_emoji(t)} {t}" for t in selected_troops_comp]) if selected_troops_comp else "Aucune"
