@@ -53,12 +53,48 @@ def fetch_player_data(player_tag: str):
             err_msg = response.text
         return None, f"Erreur API ({response.status_code}) : {err_msg}"
 
-# Liste officielle de tous les familiers de héros dans Clash of Clans
+# Liste officielle des familiers
 HERO_PETS_LIST = [
     "L.A.S.S.I", "Mighty Yak", "Electro Owl", "Unicorn", 
     "Phoenix", "Poison Lizard", "Diggy", "Frosty", 
     "Spirit Fox", "Angry Jelly", "Furnace"
 ]
+
+# Dictionnaire d'icônes par défaut ou émojis stylisés pour garantir un affichage propre et rapide
+def get_icon_emoji(name):
+    n = name.lower()
+    if "dragon" in n: return "🐉"
+    if "pekka" in n: return "🤖"
+    if "golem" in n: return "🗿"
+    if "witch" in n: return "🧙‍♀️"
+    if "wizard" in n: return "🧙‍♂️"
+    if "hog" in n: return "🐗"
+    if "valkyrie" in n: return "🪓"
+    if "minion" in n: return "🦇"
+    if "lava" in n: return "🌋"
+    if "bowler" in n: return "🎳"
+    if "electro" in n: return "⚡"
+    if "ice" in n: return "❄️"
+    if "healer" in n: return "👼"
+    if "wall" in n: return "🧱"
+    if "balloon" in n: return "🎈"
+    if "miner" in n: return "⛏️"
+    if "yeti" in n: return "🐻‍❄️"
+    if "headhunter" in n: return "🗡️"
+    if "apprentice" in n: return "🛡️"
+    if "root" in n: return "🌱"
+    if "druid" in n: return "🌿"
+    if "l.a.s.s.i" in n or "dog" in n: return "🐕"
+    if "yak" in n: return "🐂"
+    if "owl" in n: return "🦉"
+    if "unicorn" in n: return "🦄"
+    if "phoenix" in n: return "🔥"
+    if "lizard" in n: return "🦎"
+    if "diggy" in n: return "🦫"
+    if "frosty" in n: return "🧊"
+    if "fox" in n: return "🦊"
+    if "jelly" in n: return "🪼"
+    return "⚔️"
 
 # -------------------------------------------------------------------
 # 2. APP LAYOUT
@@ -114,7 +150,7 @@ else:
                         lvl = hero.get("level")
                         max_lvl = hero.get("maxLevel")
                         progress = min(lvl / max_lvl, 1.0) if max_lvl > 0 else 0
-                        st.markdown(f"### {hero['name']}")
+                        st.markdown(f"### 👑 {hero['name']}")
                         st.metric("Niveau", f"{lvl} / {max_lvl}")
                         st.progress(progress)
         else:
@@ -132,10 +168,11 @@ else:
                 max_lvl = pet.get("maxLevel")
                 remaining = max_lvl - lvl
                 progress = min(lvl / max_lvl, 1.0) if max_lvl > 0 else 0
+                icon = get_icon_emoji(pet['name'])
                 
                 with col:
                     with st.container(border=True):
-                        st.markdown(f"**{pet['name']}**")
+                        st.markdown(f"**{icon} {pet['name']}**")
                         if remaining == 0:
                             st.success(f"Max ({lvl}/{max_lvl}) ✨")
                         else:
@@ -156,7 +193,7 @@ else:
                 
                 with col:
                     with st.container(border=True):
-                        st.markdown(f"**{eq['name']}**")
+                        st.markdown(f"**🔮 {eq['name']}**")
                         st.caption(f"Niv. {lvl} / {max_lvl}")
                         st.progress(progress)
         else:
@@ -182,10 +219,11 @@ else:
                 max_lvl = troop.get("maxLevel")
                 remaining = max_lvl - lvl
                 progress = min(lvl / max_lvl, 1.0) if max_lvl > 0 else 0
+                icon = get_icon_emoji(troop['name'])
                 
                 with col:
                     with st.container(border=True):
-                        st.markdown(f"**{troop['name']}**")
+                        st.markdown(f"**{icon} {troop['name']}**")
                         if remaining == 0:
                             st.success(f"Max ({lvl}/{max_lvl}) ✨")
                         else:
@@ -208,7 +246,7 @@ else:
                 
                 with col:
                     with st.container(border=True):
-                        st.markdown(f"**{spell['name']}**")
+                        st.markdown(f"**🧪 {spell['name']}**")
                         if remaining == 0:
                             st.success(f"Max ({lvl}/{max_lvl}) ✨")
                         else:
