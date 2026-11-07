@@ -147,6 +147,9 @@ SIEGE_MACHINES_LIST = [
     "Siege Barracks", "Log Launcher", "Flame Flinger", "Battle Drill"
 ]
 
+# Liste officielle des 4 héros du village principal
+OFFICIAL_HEROES = ["Barbarian King", "Archer Queen", "Grand Warden", "Royal Champion"]
+
 def get_icon_emoji(name):
     n = name.lower()
     if "king" in n: return "👑"
@@ -425,62 +428,68 @@ else:
             st.info("Aucun sort trouvé.")
 
     # -------------------------------------------------------------------
-    # TAB 4: PARAMÉTRAGE DES COMPOSITIONS D'ATTAQUE (Multiselect dynamique)
+    # TAB 4: PARAMÉTRAGE DES COMPOSITIONS D'ATTAQUE (Hors formulaire pour affichage dynamique)
     # -------------------------------------------------------------------
     with tab_config:
         st.subheader("⚙️ Paramétrage des Compositions d'Attaque")
         
-        with st.form("composition_form"):
-            comp_title = st.text_input("Nom de la composition (ex: Root Rider Spam)")
+        comp_title = st.text_input("Nom de la composition (ex: Root Rider Spam)")
+        
+        st.markdown("### 👑 Sélection des Héros (Max 4)")
+        player_heroes = [h['name'] for h in data.get("heroes", []) if h.get("village") == "home"]
+        # Filtrer uniquement sur les vrais héros officiels possédés par le joueur
+        available_heroes = [h for h in OFFICIAL_HEROES if h in player_heroes]
+        if not available_heroes:
+            available_heroes = player_heroes # Fallback si besoin
             
-            st.markdown("### 👑 Sélection & Configuration des Héros (Max 4)")
-            available_heroes = [h['name'] for h in data.get("heroes", []) if h.get("village") == "home"]
+        hero_labels = [f"{get_icon_emoji(h)} {h}" for h in available_heroes]
+        hero_map = {f"{get_icon_emoji(h)} {h}": h for h in available_heroes}
+        
+        selected_hero_labels = st.multiselect("Choisissez les héros à inclure", hero_labels, key="hero_multiselect")
+        selected_heroes_comp = [hero_map[l] for l in selected_hero_labels]
+        
+        hero_custom_links = {}
+        if selected_heroes_comp:
+            st.markdown("---")
+            st.markdown("### 🔗 Configuration des Héros sélectionnés (Familier & Équipements)")
             available_eq = [e['name'] for e in data.get("heroEquipment", [])]
             
-            # Préparation des labels avec icônes pour le multiselect des héros
-            hero_labels = [f"{get_icon_emoji(h)} {h}" for h in available_heroes]
-            hero_map = {f"{get_icon_emoji(h)} {h}": h for h in available_heroes}
-            
-            selected_hero_labels = st.multiselect("Choisissez les héros à inclure", hero_labels)
-            selected_heroes_comp = [hero_map[l] for l in selected_hero_labels]
-            
-            hero_custom_links = {}
-            if selected_heroes_comp:
-                st.markdown("---")
-                for hero in selected_heroes_comp:
-                    hero_icon = get_icon_emoji(hero)
-                    st.markdown(f"**{hero_icon} Configuration pour {hero}**")
-                    
-                    col_p, col_eq = st.columns(2)
-                    with col_p:
-                        pet_options = ["Aucun"] + HERO_PETS_LIST
-                        pet_labels = [f"{get_icon_emoji(p)} {p}" if p != "Aucun" else "🚫 Aucun" for p in pet_options]
-                        selected_pet_idx = st.selectbox(f"Familier", range(len(pet_options)), format_func=lambda x: pet_labels[x], key=f"pet_{hero}")
-                        pet_choice = pet_options[selected_pet_idx]
-                    with col_eq:
-                        eq_labels = [f"{get_icon_emoji(e)} {e}" for e in available_eq]
-                        eq_map = {f"{get_icon_emoji(e)} {e}": e for e in available_eq}
-                        selected_eq_labels = st.multiselect(f"Équipements (max 2)", eq_labels, key=f"eq_{hero}")
-                        eq_choices = [eq_map[label] for label in selected_eq_labels]
-                    
-                    hero_custom_links[hero] = {"pet": pet_choice, "equipment": eq_choices}
-                    st.divider()
+            for hero in selected_heroes_comp:
+                hero_icon = get_icon_emoji(hero)
+                st.markdown(f"**{hero_icon} {hero}**")
+                
+                col_p, col_eq = st.columns(2)
+                with col_p:
+                    pet_options = ["Aucun"] + HERO_PETS_LIST
+                    pet_labels = [f"{get_icon_emoji(p)} {p}" if p != "Aucun" else "🚫 Aucun" for p in pet_options]
+                    selected_pet_idx = st.selectbox(f"Familier pour {hero}", range(len(pet_options)), format_func=lambda x: pet_labels[x], key=f"pet_{hero}")
+                    pet_choice = pet_options[selected_pet_idx]
+                with col_eq:
+                    eq_labels = [f"{get_icon_emoji(e)} {e}" for e in available_eq]
+                    eq_map = {f"{get_icon_emoji(e)} {e}": e for e in available_eq}
+                    selected_eq_labels = st.multiselect(f"Équipements pour {hero} (max 2)", eq_labels, key=f"eq_{hero}")
+                    eq_choices = [eq_map[label] for label in selected_eq_labels]
+                
+                hero_custom_links[hero] = {"pet": pet_choice, "equipment": eq_choices}
+                st.divider()
 
-            st.markdown("### 🧪 Troupes & Sorts de la Compo")
-            available_troops = [t['name'] for t in raw_troops if not should_exclude(t.get("name", ""))]
-            troop_labels = [f"{get_icon_emoji(t)} {t}" for t in available_troops]
-            troop_map = {f"{get_icon_emoji(t)} {t}": t for t in available_troops}
-            selected_troop_labels = st.multiselect("Sélectionner les Troupes", troop_labels)
-            selected_troops_comp = [troop_map[l] for l in selected_troop_labels]
-            
-            available_spells = [s['name'] for s in spells]
-            spell_labels = [f"🧪 {s}" for s in available_spells]
-            spell_map = {f"🧪 {s}": s for s in available_spells}
-            selected_spell_labels = st.multiselect("Sélectionner les Sorts", spell_labels)
-            selected_spells_comp = [spell_map[l] for l in selected_spell_labels]
-            
-            submitted = st.form_submit_button("Enregistrer la composition")
-            if submitted and comp_title:
+        st.markdown("### 🧪 Troupes & Sorts de la Compo")
+        available_troops = [t['name'] for t in raw_troops if not should_exclude(t.get("name", ""))]
+        troop_labels = [f"{get_icon_emoji(t)} {t}" for t in available_troops]
+        troop_map = {f"{get_icon_emoji(t)} {t}": t for t in available_troops}
+        selected_troop_labels = st.multiselect("Sélectionner les Troupes", troop_labels, key="troops_multiselect")
+        selected_troops_comp = [troop_map[l] for l in selected_troop_labels]
+        
+        available_spells = [s['name'] for s in spells]
+        spell_labels = [f"🧪 {s}" for s in available_spells]
+        spell_map = {f"🧪 {s}": s for s in available_spells}
+        selected_spell_labels = st.multiselect("Sélectionner les Sorts", spell_labels, key="spells_multiselect")
+        selected_spells_comp = [spell_map[l] for l in selected_spell_labels]
+        
+        if st.button("Enregistrer la composition", type="primary"):
+            if not comp_title:
+                st.error("❌ Veuillez saisir un nom pour la composition.")
+            else:
                 too_many_eq = False
                 for h, config in hero_custom_links.items():
                     if len(config['equipment']) > 2:
