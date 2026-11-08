@@ -6,11 +6,9 @@ def render_tab_overview():
     
     conn = get_db_client()
     
-    # Récupérer tous les comptes depuis Turso
     accounts_res = conn.execute("SELECT player_tag, name, town_hall, active_composition FROM accounts")
     accounts = accounts_res.rows
     
-    # Récupérer la liste des compositions disponibles
     comps_res = conn.execute("SELECT comp_name, town_hall_level FROM compositions")
     all_comps = comps_res.rows
     comp_options = [row[0] for row in all_comps]
@@ -19,7 +17,6 @@ def render_tab_overview():
         st.info("Aucun compte enregistré.")
         return
 
-    # En-têtes du tableau personnalisé
     header_cols = st.columns([2, 1, 1, 2, 2])
     header_cols[0].markdown("**Pseudo**")
     header_cols[1].markdown("**HDV**")
@@ -28,7 +25,6 @@ def render_tab_overview():
     header_cols[4].markdown("**Changer de compo**")
     st.divider()
 
-    # Lignes pour chaque compte
     for acc in accounts:
         tag, name, th, active_comp = acc[0], acc[1], acc[2], acc[3]
         
