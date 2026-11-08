@@ -17,7 +17,10 @@ SIEGE_MACHINES_LIST = [
 def get_db_client():
     url = os.environ.get("TURSO_DATABASE_URL", "https://coc-dashboard-2neuf.aws-eu-west-1.turso.io")
     auth_token = os.environ.get("TURSO_AUTH_TOKEN", "")
-    return libsql_client.create_client_sync(url=url, auth_token=auth_token)
+    # Forcer l'URL HTTP pour libSQL client si nécessaire, ou utiliser libsql_client en mode HTTP
+    if url.startswith("libsql://"):
+        url = url.replace("libsql://", "https://")
+    return libsql_client.create_client_sync(url=url, auth_token=auth_token, tls=True)
 
 def init_db():
     try:
