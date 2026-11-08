@@ -6,11 +6,10 @@ def render_tab_config(data, current_tag, player_name):
     st.markdown("Utilisez cet espace pour lier manuellement vos équipements à chaque héros de votre choix.")
     
     conn_db = get_db_client()
-    available_heroes = [h.get('name') for h in data.get("heroes", []) if h.get("village"] == "home"]
+    available_heroes = [h.get('name') for h in data.get("heroes", []) if h.get("village") == "home"]
     all_player_eqs = [e.get('name') for e in data.get("heroEquipment", [])]
     
     if available_heroes and all_player_eqs:
-        # Initialisation de la session si absent
         if "hero_selector_mapping" not in st.session_state:
             st.session_state.hero_selector_mapping = available_heroes[0]
 
@@ -33,11 +32,11 @@ def render_tab_config(data, current_tag, player_name):
             already_linked_eqs = [row[0] for row in res_linked.rows]
             st.session_state[multiselect_key] = [f"{get_icon_emoji(eq)} {eq}" for eq in already_linked_eqs if eq in all_player_eqs]
 
-        # Récupérer tous les équipements déjà pris par LES AUTRES héros
+        # Récupérer les équipements déjà pris par les autres héros
         res_taken = conn_db.execute("SELECT equipment_name FROM hero_equipment_config WHERE hero_name != ?", [selected_hero_to_map])
         taken_equipments = {row[0] for row in res_taken.rows}
 
-        # Filtrer la liste globale pour exclure ceux pris par d'autres (mais garder ceux du héros actuel)
+        # Filtrer pour exclure les équipements pris ailleurs
         available_eqs_for_this_hero = [
             eq for eq in all_player_eqs 
             if eq not in taken_equipments or eq in [e.replace(get_icon_emoji(e), "").strip() for e in st.session_state.get(multiselect_key, [])]
@@ -48,7 +47,7 @@ def render_tab_config(data, current_tag, player_name):
 
         with st.form("mapping_form"):
             selected_mapped_labels = st.multiselect(
-                "Cocher les équipements de ce héros (les équipements déjà assignés ailleurs sont masqués)", 
+                "Cocher les équipements de ce héros", 
                 eq_labels, 
                 key=multiselect_key
             )
@@ -113,7 +112,7 @@ def render_tab_config(data, current_tag, player_name):
             st.divider()
 
     st.markdown("### 🧪 Troupes & Sorts de la Compo")
-    raw_troops = [t for t in data.get("troops", []) if t.get("village"] == "home"]
+    raw_troops = [t for t in data.get("troops", []) if t.get("village") == "home"]
     
     def should_exclude(name):
         name_lower = name.lower()
@@ -128,7 +127,7 @@ def render_tab_config(data, current_tag, player_name):
     selected_troop_labels = st.multiselect("Sélectionner les Troupes", troop_labels, key="troops_multiselect")
     selected_troops_comp = [troop_map[l] for l in selected_troop_labels]
     
-    spells = [s for s in data.get("spells", []) if s.get("village"] == "home"]
+    spells = [s for s in data.get("spells", []) if s.get("village") == "home"]
     available_spells = [s.get('name') for s in spells]
     spell_labels = [f"🧪 {s}" for s in available_spells]
     spell_map = {f"🧪 {s}": s for s in available_spells}
