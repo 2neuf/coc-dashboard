@@ -10,21 +10,40 @@ def render_tab_config(data, current_tag, player_name):
     all_player_eqs = [e.get('name') for e in data.get("heroEquipment", [])]
     
     if available_heroes and all_player_eqs:
-        with st.form("mapping_form"):
-            selected_hero_to_map = st.selectbox("Sélectionner un héros", available_heroes, key="hero_selector_mapping")
-            
+        # Initialisation du héros sélectionné dans la session si absent
+        if "mapping_hero" not in st.session_state:
+            st.session_state.mapping_hero = available_heroes[0]
+
+        # Callback pour réinitialiser / charger les équipements du héros sélectionné
+        def on_hero_change():
+            hero = st.session_state.hero_selector_mapping
+            res_linked = conn_db.execute("SELECT equipment_name FROM hero_equipment_config WHERE hero_name = ?", [hero])
+            already_linked_eqs = [row[0] for row in res_linked.rows]
+            st.session_state.mapping_multiselect = [f"{get_icon_emoji(eq)} {eq}" for eq in already_linked_eqs if eq in all_player_eqs]
+
+        # Sélecteur de héros avec callback de changement
+        selected_hero_to_map = st.selectbox(
+            "Sélectionner un héros", 
+            available_heroes, 
+            key="hero_selector_mapping",
+            on_change=on_hero_change
+        )
+
+        # Au premier chargement, s'assurer que la session state du multiselect est initialisée pour le héros actif
+        multiselect_key = "mapping_multiselect"
+        if multiselect_key not in st.session_state:
             res_linked = conn_db.execute("SELECT equipment_name FROM hero_equipment_config WHERE hero_name = ?", [selected_hero_to_map])
             already_linked_eqs = [row[0] for row in res_linked.rows]
-            
-            eq_labels = [f"{get_icon_emoji(eq)} {eq}" for eq in all_player_eqs]
-            eq_map = {f"{get_icon_emoji(eq)} {eq}": eq for eq in all_player_eqs}
-            default_selection = [f"{get_icon_emoji(eq)} {eq}" for eq in already_linked_eqs if eq in all_player_eqs]
-            
+            st.session_state[multiselect_key] = [f"{get_icon_emoji(eq)} {eq}" for eq in already_linked_eqs if eq in all_player_eqs]
+
+        eq_labels = [f"{get_icon_emoji(eq)} {eq}" for eq in all_player_eqs]
+        eq_map = {f"{get_icon_emoji(eq)} {eq}": eq for eq in all_player_eqs}
+
+        with st.form("mapping_form"):
             selected_mapped_labels = st.multiselect(
                 "Cocher les équipements de ce héros", 
                 eq_labels, 
-                default=default_selection, 
-                key=f"mapping_multiselect_{selected_hero_to_map}"
+                key=multiselect_key
             )
             
             submitted_mapping = st.form_submit_button("Sauvegarder l'association des équipements")
