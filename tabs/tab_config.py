@@ -6,22 +6,20 @@ def render_tab_config(data, current_tag, player_name):
     st.markdown("Utilisez cet espace pour lier manuellement vos équipements à chaque héros de votre choix.")
     
     conn_db = get_db_client()
-    available_heroes = [h.get('name') for h in data.get("heroes", []) if h.get("village") == "home"]
+    available_heroes = [h.get('name') for h in data.get("heroes", []) if h.get("village"] == "home"]
     all_player_eqs = [e.get('name') for e in data.get("heroEquipment", [])]
     
     if available_heroes and all_player_eqs:
-        # Initialisation du héros sélectionné dans la session si absent
-        if "mapping_hero" not in st.session_state:
-            st.session_state.mapping_hero = available_heroes[0]
+        # Initialisation de la session si absent
+        if "hero_selector_mapping" not in st.session_state:
+            st.session_state.hero_selector_mapping = available_heroes[0]
 
-        # Callback pour réinitialiser / charger les équipements du héros sélectionné
         def on_hero_change():
             hero = st.session_state.hero_selector_mapping
             res_linked = conn_db.execute("SELECT equipment_name FROM hero_equipment_config WHERE hero_name = ?", [hero])
             already_linked_eqs = [row[0] for row in res_linked.rows]
             st.session_state.mapping_multiselect = [f"{get_icon_emoji(eq)} {eq}" for eq in already_linked_eqs if eq in all_player_eqs]
 
-        # Sélecteur de héros avec callback de changement
         selected_hero_to_map = st.selectbox(
             "Sélectionner un héros", 
             available_heroes, 
@@ -29,19 +27,28 @@ def render_tab_config(data, current_tag, player_name):
             on_change=on_hero_change
         )
 
-        # Au premier chargement, s'assurer que la session state du multiselect est initialisée pour le héros actif
         multiselect_key = "mapping_multiselect"
         if multiselect_key not in st.session_state:
             res_linked = conn_db.execute("SELECT equipment_name FROM hero_equipment_config WHERE hero_name = ?", [selected_hero_to_map])
             already_linked_eqs = [row[0] for row in res_linked.rows]
             st.session_state[multiselect_key] = [f"{get_icon_emoji(eq)} {eq}" for eq in already_linked_eqs if eq in all_player_eqs]
 
-        eq_labels = [f"{get_icon_emoji(eq)} {eq}" for eq in all_player_eqs]
-        eq_map = {f"{get_icon_emoji(eq)} {eq}": eq for eq in all_player_eqs}
+        # Récupérer tous les équipements déjà pris par LES AUTRES héros
+        res_taken = conn_db.execute("SELECT equipment_name FROM hero_equipment_config WHERE hero_name != ?", [selected_hero_to_map])
+        taken_equipments = {row[0] for row in res_taken.rows}
+
+        # Filtrer la liste globale pour exclure ceux pris par d'autres (mais garder ceux du héros actuel)
+        available_eqs_for_this_hero = [
+            eq for eq in all_player_eqs 
+            if eq not in taken_equipments or eq in [e.replace(get_icon_emoji(e), "").strip() for e in st.session_state.get(multiselect_key, [])]
+        ]
+
+        eq_labels = [f"{get_icon_emoji(eq)} {eq}" for eq in available_eqs_for_this_hero]
+        eq_map = {f"{get_icon_emoji(eq)} {eq}": eq for eq in available_eqs_for_this_hero}
 
         with st.form("mapping_form"):
             selected_mapped_labels = st.multiselect(
-                "Cocher les équipements de ce héros", 
+                "Cocher les équipements de ce héros (les équipements déjà assignés ailleurs sont masqués)", 
                 eq_labels, 
                 key=multiselect_key
             )
@@ -50,8 +57,9 @@ def render_tab_config(data, current_tag, player_name):
             if submitted_mapping:
                 conn_db.execute("DELETE FROM hero_equipment_config WHERE hero_name = ?", [selected_hero_to_map])
                 for label in selected_mapped_labels:
-                    eq_name = eq_map[label]
-                    conn_db.execute("INSERT INTO hero_equipment_config (hero_name, equipment_name) VALUES (?, ?)", [selected_hero_to_map, eq_name])
+                    if label in eq_map:
+                        eq_name = eq_map[label]
+                        conn_db.execute("INSERT INTO hero_equipment_config (hero_name, equipment_name) VALUES (?, ?)", [selected_hero_to_map, eq_name])
                 st.success(f"Association enregistrée pour {selected_hero_to_map} !")
                 st.rerun()
     else:
@@ -105,7 +113,7 @@ def render_tab_config(data, current_tag, player_name):
             st.divider()
 
     st.markdown("### 🧪 Troupes & Sorts de la Compo")
-    raw_troops = [t for t in data.get("troops", []) if t.get("village") == "home"]
+    raw_troops = [t for t in data.get("troops", []) if t.get("village"] == "home"]
     
     def should_exclude(name):
         name_lower = name.lower()
@@ -120,7 +128,7 @@ def render_tab_config(data, current_tag, player_name):
     selected_troop_labels = st.multiselect("Sélectionner les Troupes", troop_labels, key="troops_multiselect")
     selected_troops_comp = [troop_map[l] for l in selected_troop_labels]
     
-    spells = [s for s in data.get("spells", []) if s.get("village") == "home"]
+    spells = [s for s in data.get("spells", []) if s.get("village"] == "home"]
     available_spells = [s.get('name') for s in spells]
     spell_labels = [f"🧪 {s}" for s in available_spells]
     spell_map = {f"🧪 {s}": s for s in available_spells}
