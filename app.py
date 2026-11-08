@@ -63,7 +63,8 @@ player_name = selected_account_name
 
 st.sidebar.info(f"Pseudo : **{player_name}**\nTag : **{current_tag}**")
 
-current_favorites = get_db_favorites(current_tag)
+# Récupération des favoris globaux partagés entre tous les comptes
+current_favorites = get_db_favorites()
 
 with st.spinner("Fetching data from Supercell API..."):
     data, err = fetch_player_data(current_tag)
@@ -91,10 +92,10 @@ else:
         render_tab_overview()
 
     with tab_army:
-        render_tab_army(data, current_tag, current_favorites)
+        render_tab_army(data, current_favorites)
 
     with tab_troops:
-        render_tab_troops(data, current_tag, current_favorites)
+        render_tab_troops(data, current_favorites)
 
     with tab_config:
-        render_tab_config(data, current_tag, player_name)
+        render_tab_config(data, current_tag, player_name, current_favorites)
