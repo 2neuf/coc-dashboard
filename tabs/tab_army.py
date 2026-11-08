@@ -1,7 +1,7 @@
 import streamlit as st
 from utils import sort_items, render_card, get_icon_emoji, HERO_PETS_LIST
 
-def render_tab_army(data, current_tag, current_favorites):
+def render_tab_army(data, current_favorites):
     st.subheader("👑 Héros")
     heroes = data.get("heroes", [])
     home_heroes = [h for h in heroes if h.get("village") == "home"]
@@ -10,7 +10,7 @@ def render_tab_army(data, current_tag, current_favorites):
         hero_cols = st.columns(len(sorted_heroes))
         for idx, hero in enumerate(sorted_heroes):
             with hero_cols[idx]:
-                render_card(hero.get('name'), hero.get("level"), hero.get("maxLevel"), current_tag, current_favorites, get_icon_emoji(hero.get('name', '')))
+                render_card(hero.get('name'), hero.get("level"), hero.get("maxLevel"), current_favorites, get_icon_emoji(hero.get('name', '')))
     else:
         st.info("Aucun héros trouvé.")
             
@@ -24,7 +24,7 @@ def render_tab_army(data, current_tag, current_favorites):
         for idx, pet in enumerate(sorted_pets):
             col = pet_cols[idx % 4]
             with col:
-                render_card(pet.get('name'), pet.get("level"), pet.get("maxLevel"), current_tag, current_favorites, get_icon_emoji(pet.get('name', '')))
+                render_card(pet.get('name'), pet.get("level"), pet.get("maxLevel"), current_favorites, get_icon_emoji(pet.get('name', '')))
     else:
         st.info("Aucun familier trouvé.")
 
@@ -36,6 +36,6 @@ def render_tab_army(data, current_tag, current_favorites):
         for idx, eq in enumerate(sorted_eq):
             col = eq_cols[idx % 4]
             with col:
-                render_card(eq.get('name'), eq.get("level"), eq.get("maxLevel"), current_tag, current_favorites, get_icon_emoji(eq.get('name', '')))
+                render_card(eq.get('name'), eq.get("level"), eq.get("maxLevel"), current_favorites, get_icon_emoji(eq.get('name', '')))
     else:
         st.info("Aucun équipement trouvé.")
