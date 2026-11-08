@@ -1,6 +1,7 @@
 import streamlit as st
 import libsql_client
 import os
+import requests
 
 # Liste officielle des familiers de héros (incluant Greedy Raven)
 HERO_PETS_LIST = [
@@ -63,6 +64,35 @@ def init_db():
         INSERT OR IGNORE INTO accounts (player_tag, name, town_hall, active_composition) 
         VALUES (?, ?, ?, ?)
     """, ["#YJ0U9P89V", "Mini", 18, "Aucune"])
+
+def get_all_accounts():
+    conn = get_db_client()
+    res = conn.execute("SELECT player_tag, name, town_hall, active_composition FROM accounts")
+    accounts = []
+    for row in res.rows:
+        accounts.append({
+            "tag": row[0],
+            "name": row[1],
+            "townHall": row[2],
+            "active_composition": row[3] if len(row) > 3 else "Aucune"
+        })
+    return accounts
+
+def fetch_player_data(player_tag):
+    api_token = os.environ.get("COC_API_TOKEN", "")
+    formatted_tag = player_tag.replace("#", "%23")
+    url = f"https://api.clashofclans.com/v1/players/{formatted_tag}"
+    headers = {
+        "Authorization": f"Bearer {api_token}",
+        "Accept": "application/json"
+    }
+    try:
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            return response.json()
+    except Exception:
+        pass
+    return None
 
 def get_db_favorites():
     conn = get_db_client()
