@@ -72,15 +72,8 @@ def init_db():
 def get_all_accounts():
     conn = get_db_client()
     res = conn.execute("SELECT player_tag, name, town_hall, active_composition FROM accounts")
-    accounts = []
-    for row in res.rows:
-        accounts.append({
-            "tag": row[0],
-            "name": row[1],
-            "townHall": row[2],
-            "active_composition": row[3] if len(row) > 3 else "Aucune"
-        })
-    return accounts
+    # On renvoie directement les tuples (player_tag, name, town_hall, active_composition)
+    return [row for row in res.rows]
 
 def fetch_player_data(player_tag):
     api_token = os.environ.get("COC_API_TOKEN", "")
