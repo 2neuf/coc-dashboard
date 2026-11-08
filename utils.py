@@ -89,10 +89,10 @@ def fetch_player_data(player_tag):
     try:
         response = requests.get(url, headers=headers)
         if response.status_code == 200:
-            return response.json()
-    except Exception:
-        pass
-    return None
+            return response.json(), None
+    except Exception as e:
+        return None, str(e)
+    return None, "Erreur API"
 
 def get_db_favorites():
     conn = get_db_client()
@@ -117,6 +117,22 @@ def get_icon_emoji(name):
         "Spirit Fox": "🦊", "Angry Jelly": "🪼", "Sneezy": "🤧", "Greedy Raven": "🦅"
     }
     return icons.get(name, "⚔️")
+
+def render_card(name, level, max_level, favorites, emoji="⚔️"):
+    is_fav = name in favorites
+    fav_symbol = "❤️" if is_fav else "🤍"
+    
+    st.markdown(f"""
+        <div style="border: 1px solid #333; padding: 10px; border-radius: 8px; margin-bottom: 8px; background-color: #1e1e1e;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 1.1em;">{emoji} <b>{name}</b></span>
+                <span>{fav_symbol}</span>
+            </div>
+            <div style="margin-top: 5px; font-size: 0.9em; color: #aaa;">
+                Niveau : <b>{level}</b> / {max_level}
+            </div>
+        </div>
+    """, unsafe_allow_html=True)
 
 def update_account_composition(player_tag, comp_name):
     conn = get_db_client()
