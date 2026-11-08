@@ -1,5 +1,5 @@
 import streamlit as st
-from utils import get_db_client, get_icon_emoji, update_account_composition, sort_items, HERO_PETS_LIST, SIEGE_MACHINES_LIST
+from utils import get_db_client, get_icon_emoji, sort_items, HERO_PETS_LIST, SIEGE_MACHINES_LIST
 
 def render_tab_config(data, current_tag, player_name, current_favorites):
     st.subheader("🛠️ Gestion dynamique : Associer les Équipements aux Héros")
@@ -65,7 +65,11 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
     st.divider()
     st.subheader("⚙️ Paramétrage des Compositions d'Attaque")
     
-    comp_title = st.text_input("Nom de la composition (ex: Root Rider Spam)")
+    col_t1, col_t2 = st.columns([0.75, 0.25])
+    with col_t1:
+        comp_title = st.text_input("Nom de la composition (ex: Root Rider Spam)")
+    with col_t2:
+        comp_th_level = st.selectbox("Niveau HDV cible", [18, 17, 16, 15], key="comp_th_selector")
     
     hero_labels = [f"{get_icon_emoji(h)} {h}" for h in available_heroes]
     hero_map = {f"{get_icon_emoji(h)} {h}": h for h in available_heroes}
@@ -164,27 +168,12 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
                 troops_display = ", ".join([f"{get_icon_emoji(t)} {t}" for t in selected_troops_comp]) if selected_troops_comp else "Aucune"
                 spells_display = ", ".join([f"🧪 {s}" for s in selected_spells_comp]) if selected_spells_comp else "Aucun"
 
-                comp_details = f"Héros -> {' / '.join(heroes_summary_list) if heroes_summary_list else 'Aucun'} | Troupes: {troops_display} | Sorts: {spells_display}"
+                comp_details = f"[HDV {comp_th_level}] Héros -> {' / '.join(heroes_summary_list) if heroes_summary_list else 'Aucun'} | Troupes: {troops_display} | Sorts: {spells_display}"
                 
                 conn = get_db_client()
-                conn.execute("INSERT OR REPLACE INTO compositions (comp_name, details) VALUES (?, ?)", [comp_title, comp_details])
-                st.success(f"Composition '{comp_title}' enregistrée avec succès !")
+                conn.execute(
+                    "INSERT OR REPLACE INTO compositions (comp_name, details, town_hall_level) VALUES (?, ?, ?)", 
+                    [comp_title, comp_details, comp_th_level]
+                )
+                st.success(f"Composition '{comp_title}' (HDV {comp_th_level}) enregistrée avec succès !")
                 st.rerun()
-
-    st.divider()
-    st.subheader("🎯 Assigner une composition au joueur actif")
-    
-    conn = get_db_client()
-    comps_res = conn.execute("SELECT comp_name FROM compositions")
-    all_comps = [row[0] for row in comps_res.rows]
-    
-    if all_comps:
-        current_assigned = conn.execute("SELECT active_composition FROM accounts WHERE player_tag = ?", [current_tag]).rows[0][0]
-        selected_comp = st.selectbox("Choisir la compo pour ce joueur", all_comps, index=all_comps.index(current_assigned) if current_assigned in all_comps else 0)
-        
-        if st.button("Sauvegarder l'association pour ce compte"):
-            update_account_composition(current_tag, selected_comp)
-            st.success(f"Composition '{selected_comp}' assignée à {player_name} !")
-            st.rerun()
-    else:
-        st.info("Aucune composition enregistrée pour le moment. Créez-en une ci-dessus.")
