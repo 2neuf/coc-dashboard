@@ -1,7 +1,7 @@
 import streamlit as st
 from utils import sort_items, render_card, get_icon_emoji, HERO_PETS_LIST, SIEGE_MACHINES_LIST
 
-def render_tab_troops(data, current_tag, current_favorites):
+def render_tab_troops(data, current_favorites):
     st.subheader("🧪 Progression des Troupes (Village Principal)")
     raw_troops = [t for t in data.get("troops", []) if t.get("village") == "home"]
     
@@ -20,7 +20,7 @@ def render_tab_troops(data, current_tag, current_favorites):
         for idx, troop in enumerate(sorted_troops):
             col = cols[idx % 4]
             with col:
-                render_card(troop.get('name'), troop.get("level"), troop.get("maxLevel"), current_tag, current_favorites, get_icon_emoji(troop.get('name', '')))
+                render_card(troop.get('name'), troop.get("level"), troop.get("maxLevel"), current_favorites, get_icon_emoji(troop.get('name', '')))
     else:
         st.info("Aucune troupe trouvée.")
 
@@ -33,7 +33,7 @@ def render_tab_troops(data, current_tag, current_favorites):
         for idx, siege in enumerate(sorted_siege):
             col = siege_cols[idx % 4]
             with col:
-                render_card(siege.get('name'), siege.get("level"), siege.get("maxLevel"), current_tag, current_favorites, get_icon_emoji(siege.get('name', '')))
+                render_card(siege.get('name'), siege.get("level"), siege.get("maxLevel"), current_favorites, get_icon_emoji(siege.get('name', '')))
     else:
         st.info("Aucun engin de siège trouvé.")
 
@@ -46,6 +46,6 @@ def render_tab_troops(data, current_tag, current_favorites):
         for idx, spell in enumerate(sorted_spells):
             col = spell_cols[idx % 4]
             with col:
-                render_card(spell.get('name'), spell.get("level"), spell.get("maxLevel"), current_tag, current_favorites, "🧪")
+                render_card(spell.get('name'), spell.get("level"), spell.get("maxLevel"), current_favorites, "🧪")
     else:
         st.info("Aucun sort trouvé.")
