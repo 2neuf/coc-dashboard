@@ -3,7 +3,6 @@ import requests
 import libsql_client
 import urllib.parse
 
-# Listes officielles
 HERO_PETS_LIST = [
     "L.A.S.S.I", "Mighty Yak", "Electro Owl", "Unicorn", 
     "Phoenix", "Poison Lizard", "Diggy", "Frosty", 
@@ -41,11 +40,10 @@ def init_db():
     except Exception:
         pass
 
+    # Table des favoris globale (uniquement item_name)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS favorites (
-            player_tag TEXT,
-            item_name TEXT,
-            PRIMARY KEY (player_tag, item_name)
+            item_name TEXT PRIMARY KEY
         )
     """)
     conn.execute("""
@@ -67,18 +65,18 @@ def init_db():
         VALUES (?, ?, ?, ?)
     """, ["#YJ0U9P89V", "Mini", 18, "Aucune"])
 
-def get_db_favorites(player_tag):
+def get_db_favorites():
     conn = get_db_client()
-    res = conn.execute("SELECT item_name FROM favorites WHERE player_tag = ?", [player_tag])
+    res = conn.execute("SELECT item_name FROM favorites")
     return {row[0] for row in res.rows}
 
-def add_db_favorite(player_tag, item_name):
+def add_db_favorite(item_name):
     conn = get_db_client()
-    conn.execute("INSERT OR IGNORE INTO favorites (player_tag, item_name) VALUES (?, ?)", [player_tag, item_name])
+    conn.execute("INSERT OR IGNORE INTO favorites (item_name) VALUES (?)", [item_name])
 
-def remove_db_favorite(player_tag, item_name):
+def remove_db_favorite(item_name):
     conn = get_db_client()
-    conn.execute("DELETE FROM favorites WHERE player_tag = ? AND item_name = ?", [player_tag, item_name])
+    conn.execute("DELETE FROM favorites WHERE item_name = ?", [item_name])
 
 def get_all_accounts():
     conn = get_db_client()
@@ -172,7 +170,7 @@ def sort_items(items, current_favorites):
     
     return sorted_favs + sorted_non_favs
 
-def render_card(name, lvl, max_lvl, current_tag, current_favorites, icon="⚔️"):
+def render_card(name, lvl, max_lvl, current_favorites, icon="⚔️"):
     remaining = max_lvl - lvl
     is_max = (remaining == 0)
     progress_pct = int(min(lvl / max_lvl, 1.0) * 100) if max_lvl > 0 else 0
@@ -189,11 +187,11 @@ def render_card(name, lvl, max_lvl, current_tag, current_favorites, icon="⚔️
             else:
                 st.markdown(f"**{icon} {name}**")
         with col_btn:
-            if st.button(fav_icon, key=f"fav_btn_{name}_{current_tag}", help="Favori"):
+            if st.button(fav_icon, key=f"fav_btn_{name}", help="Favori"):
                 if is_fav:
-                    remove_db_favorite(current_tag, name)
+                    remove_db_favorite(name)
                 else:
-                    add_db_favorite(current_tag, name)
+                    add_db_favorite(name)
                 st.rerun()
                 
         if is_max:
