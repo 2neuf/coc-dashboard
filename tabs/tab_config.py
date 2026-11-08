@@ -1,12 +1,12 @@
 import streamlit as st
-from utils import get_db_client, get_icon_emoji, update_account_composition, HERO_PETS_LIST, SIEGE_MACHINES_LIST
+from utils import get_db_client, get_icon_emoji, update_account_composition, sort_items, HERO_PETS_LIST, SIEGE_MACHINES_LIST
 
-def render_tab_config(data, current_tag, player_name):
+def render_tab_config(data, current_tag, player_name, current_favorites):
     st.subheader("🛠️ Gestion dynamique : Associer les Équipements aux Héros")
     st.markdown("Utilisez cet espace pour lier manuellement vos équipements à chaque héros de votre choix.")
     
     conn_db = get_db_client()
-    available_heroes = [h.get('name') for h in data.get("heroes", []) if h.get("village") == "home"]
+    available_heroes = [h.get('name') for h in data.get("heroes", []) if h.get("village"] == "home"]
     all_player_eqs = [e.get('name') for e in data.get("heroEquipment", [])]
     
     if available_heroes and all_player_eqs:
@@ -32,11 +32,10 @@ def render_tab_config(data, current_tag, player_name):
             already_linked_eqs = [row[0] for row in res_linked.rows]
             st.session_state[multiselect_key] = [f"{get_icon_emoji(eq)} {eq}" for eq in already_linked_eqs if eq in all_player_eqs]
 
-        # Récupérer les équipements déjà pris par les autres héros
+        # Exclure les équipements pris par les autres héros
         res_taken = conn_db.execute("SELECT equipment_name FROM hero_equipment_config WHERE hero_name != ?", [selected_hero_to_map])
         taken_equipments = {row[0] for row in res_taken.rows}
 
-        # Filtrer pour exclure les équipements pris ailleurs
         available_eqs_for_this_hero = [
             eq for eq in all_player_eqs 
             if eq not in taken_equipments or eq in [e.replace(get_icon_emoji(e), "").strip() for e in st.session_state.get(multiselect_key, [])]
@@ -81,16 +80,26 @@ def render_tab_config(data, current_tag, player_name):
         st.markdown("---")
         st.markdown("### 🔗 Configuration des Héros sélectionnés (Familier & Équipements)")
         
+        # Récupérer les familiers déjà assignés par les autres héros dans la session/formulaire
+        # Pour simplifier, on liste tous les familiers du joueur triés selon les favoris et niveaux
+        raw_troops_for_pets = data.get("troops", [])
+        pets_raw_objs = [t for t in raw_troops_for_pets if t.get("name") in HERO_PETS_LIST]
+        sorted_pets_objs = sort_items(pets_raw_objs, current_favorites)
+        all_player_pets = [p.get('name') for p in sorted_pets_objs]
+
         for hero in selected_heroes_comp:
             hero_icon = get_icon_emoji(hero)
             st.markdown(f"**{hero_icon} {hero}**")
             
             col_p, col_eq = st.columns(2)
             with col_p:
-                pet_options = ["Aucun"] + HERO_PETS_LIST
-                pet_labels = [f"{get_icon_emoji(p)} {p}" if p != "Aucun" else "🚫 Aucun" for p in pet_options]
-                selected_pet_idx = st.selectbox(f"Familier pour {hero}", range(len(pet_options)), format_func=lambda x: pet_labels[x], key=f"pet_{hero}")
-                pet_choice = pet_options[selected_pet_idx]
+                # Exclure les familiers déjà choisis par les autres héros de la composition en cours
+                other_heroes_pets = [cfg["pet"] for h_name, cfg in hero_custom_links.items() if h_name != hero]
+                available_pets_for_hero = ["Aucun"] + [p for p in all_player_pets if p not in other_heroes_pets]
+                
+                pet_labels = [f"{get_icon_emoji(p)} {p}" if p != "Aucun" else "🚫 Aucun" for p in available_pets_for_hero]
+                selected_pet_idx = st.selectbox(f"Familier pour {hero}", range(len(available_pets_for_hero)), format_func=lambda x: pet_labels[x], key=f"pet_{hero}")
+                pet_choice = available_pets_for_hero[selected_pet_idx]
             
             with col_eq:
                 res_cfg = conn_db.execute("SELECT equipment_name FROM hero_equipment_config WHERE hero_name = ?", [hero])
@@ -112,7 +121,7 @@ def render_tab_config(data, current_tag, player_name):
             st.divider()
 
     st.markdown("### 🧪 Troupes & Sorts de la Compo")
-    raw_troops = [t for t in data.get("troops", []) if t.get("village") == "home"]
+    raw_troops = [t for t in data.get("troops", []) if t.get("village"] == "home"]
     
     def should_exclude(name):
         name_lower = name.lower()
@@ -121,14 +130,19 @@ def render_tab_config(data, current_tag, player_name):
         is_siege = name in SIEGE_MACHINES_LIST
         return is_super or is_pet or is_siege
 
-    available_troops = [t.get('name') for t in raw_troops if not should_exclude(t.get("name", ""))]
+    troops_raw_objs = [t for t in raw_troops if not should_exclude(t.get("name", ""))]
+    sorted_troops_objs = sort_items(troops_raw_objs, current_favorites)
+    available_troops = [t.get('name') for t in sorted_troops_objs]
+    
     troop_labels = [f"{get_icon_emoji(t)} {t}" for t in available_troops]
     troop_map = {f"{get_icon_emoji(t)} {t}": t for t in available_troops}
     selected_troop_labels = st.multiselect("Sélectionner les Troupes", troop_labels, key="troops_multiselect")
     selected_troops_comp = [troop_map[l] for l in selected_troop_labels]
     
-    spells = [s for s in data.get("spells", []) if s.get("village") == "home"]
-    available_spells = [s.get('name') for s in spells]
+    spells_raw_objs = [s for s in data.get("spells", []) if s.get("village"] == "home"]
+    sorted_spells_objs = sort_items(spells_raw_objs, current_favorites)
+    available_spells = [s.get('name') for s in sorted_spells_objs]
+    
     spell_labels = [f"🧪 {s}" for s in available_spells]
     spell_map = {f"🧪 {s}": s for s in available_spells}
     selected_spell_labels = st.multiselect("Sélectionner les Sorts", spell_labels, key="spells_multiselect")
