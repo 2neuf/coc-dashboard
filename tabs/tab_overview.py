@@ -16,7 +16,7 @@ def render_tab_overview():
 
     conn = get_db_client()
     
-    # Récupération des comptes triés par display_order incluant town_hall
+    # Récupération des comptes triés par display_order actuel
     accounts_res = conn.execute("SELECT player_tag, name, town_hall, active_composition, display_order FROM accounts ORDER BY display_order ASC, name ASC")
     db_accounts = accounts_res.rows
     
@@ -48,6 +48,7 @@ def render_tab_overview():
             if w and (w.get("clan", {}).get("tag") == CLAN_TAG or w.get("opponent", {}).get("tag") == CLAN_TAG):
                 my_clan_wars.append(w)
         
+        # Tri chronologique par date de départ pour extraire exactement les 7 rounds de combat
         my_clan_wars = sorted(my_clan_wars, key=lambda x: x.get("startTime", ""))[:7]
         actual_days_columns = [f"Jour {i+1}" for i in range(len(my_clan_wars))]
         
@@ -65,7 +66,10 @@ def render_tab_overview():
                 if p_tag not in players_data:
                     players_data[p_tag] = {
                         "name": p_name,
-                        "days": {d: "⏳ Non jouée" for d in actual_days_columns}
+                        "days": {d: "⏳ Non jouée" for d in actual_days_columns},
+                        "total_stars": 0,
+                        "total_destruction": 0.0,
+                        "attacks_count": 0
                     }
                 else:
                     players_data[p_tag]["name"] = p_name
@@ -75,7 +79,12 @@ def render_tab_overview():
                     atk_details = []
                     for atk in attacks:
                         stars = atk.get("stars", 0)
-                        destruction = atk.get("destructionPercentage", 0)
+                        destruction = atk.get("destructionPercentage", 0.0)
+                        
+                        players_data[p_tag]["total_stars"] += stars
+                        players_data[p_tag]["total_destruction"] += destruction
+                        players_data[p_tag]["attacks_count"] += 1
+                        
                         icon = "⭐" if stars > 0 else "❌"
                         atk_details.append(f"{icon} {stars}★ ({destruction}%)")
                     players_data[p_tag]["days"][day_col] = " | ".join(atk_details)
@@ -88,6 +97,20 @@ def render_tab_overview():
                 info = players_data[p_tag]
                 row = {"Membre": info["name"]}
                 row.update(info["days"])
+                
+                # Calcul des totaux et moyennes pour les colonnes récapitulatives
+                t_stars = info["total_stars"]
+                t_dest = info["total_destruction"]
+                atk_cnt = info["attacks_count"]
+                
+                avg_stars = round(t_stars / atk_cnt, 2) if atk_cnt > 0 else 0.0
+                avg_dest = round(t_dest / atk_cnt, 1) if atk_cnt > 0 else 0.0
+                
+                row["Total ⭐"] = t_stars
+                row["Total 💥"] = f"{round(t_dest, 1)}%"
+                row["Moy. ⭐ / Atk"] = avg_stars
+                row["Moy. 💥 / Atk"] = f"{avg_dest}%"
+                
                 df_rows.append(row)
                 
             df = pd.DataFrame(df_rows)
@@ -128,7 +151,7 @@ def render_tab_overview():
             row_cols = st.columns([1, 0.5, 0.5, 4.5, 1.1, 0.6])
             
             row_cols[0].markdown(f"**{name}**")
-            row_cols[1].markdown(f"TH {th}")  # Affiche le véritable niveau d'HDV récupéré de la ligue/base
+            row_cols[1].markdown(f"TH {th}")
             row_cols[2].markdown("0 🏆")
             
             details_raw = all_comps.get(active_comp, "") if active_comp else ""
