@@ -63,13 +63,31 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
         st.info("Aucun héros ou équipement détecté par l'API pour ce joueur.")
 
     st.divider()
-    st.subheader("⚙️ Paramétrage des Compositions d'Attaque")
+    st.subheader("⚙️ Paramétrage & Modification des Compositions d'Attaque")
     
+    # Récupérer les compositions existantes pour le mode modification
+    comps_res = conn_db.execute("SELECT comp_name, town_hall_level FROM compositions")
+    existing_comps = [row[0] for row in comps_res.rows]
+    
+    mode_options = ["➕ Créer une nouvelle composition"] + [f"✏️ Modifier : {c}" for c in existing_comps]
+    selected_mode = st.selectbox("Mode de gestion", mode_options)
+    
+    default_comp_name = ""
+    default_th = 18
+    
+    if "✏️ Modifier :" in selected_mode:
+        target_comp_name = selected_mode.replace("✏️ Modifier : ", "")
+        default_comp_name = target_comp_name
+        res_comp_info = conn_db.execute("SELECT town_hall_level FROM compositions WHERE comp_name = ?", [target_comp_name])
+        row_th = res_comp_info.rows
+        if row_th:
+            default_th = row_th[0]
+
     col_t1, col_t2 = st.columns([0.75, 0.25])
     with col_t1:
-        comp_title = st.text_input("Nom de la composition (ex: Root Rider Spam)")
+        comp_title = st.text_input("Nom de la composition", value=default_comp_name)
     with col_t2:
-        comp_th_level = st.selectbox("Niveau HDV cible", [18, 17, 16, 15], key="comp_th_selector")
+        comp_th_level = st.selectbox("Niveau HDV cible", [18, 17, 16, 15], index=[18, 17, 16, 15].index(default_th) if default_th in [18, 17, 16, 15] else 0, key="comp_th_selector")
     
     hero_labels = [f"{get_icon_emoji(h)} {h}" for h in available_heroes]
     hero_map = {f"{get_icon_emoji(h)} {h}": h for h in available_heroes}
@@ -113,9 +131,6 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
                 
                 selected_eq_labels = st.multiselect(f"Équipements pour {hero} (max 2)", eq_labels_hero, key=f"eq_{hero}")
                 eq_choices = [eq_map_hero[label] for label in selected_eq_labels]
-                
-                if not eq_choices:
-                    st.warning(f"⚠️ Veuillez configurer et sélectionner les équipements de **{hero}** dans l'outil de gestion ci-dessus ou les cocher ici.")
             
             hero_custom_links[hero] = {"pet": pet_choice, "equipment": eq_choices}
             st.divider()
@@ -148,7 +163,7 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
     selected_spell_labels = st.multiselect("Sélectionner les Sorts", spell_labels, key="spells_multiselect")
     selected_spells_comp = [spell_map[l] for l in selected_spell_labels]
     
-    if st.button("Enregistrer la composition", type="primary"):
+    if st.button("Enregistrer / Mettre à jour la composition", type="primary"):
         if not comp_title:
             st.error("❌ Veuillez saisir un nom pour la composition.")
         else:
@@ -161,19 +176,19 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
             if not too_many_eq:
                 heroes_summary_list = []
                 for h, config in hero_custom_links.items():
-                    pet_display = f"{get_icon_emoji(config['pet'])} {config['pet']}" if config['pet'] != "Aucun" else "Aucun"
-                    eq_display = ", ".join([f"{get_icon_emoji(e)} {e}" for e in config['equipment']]) if config['equipment'] else "Aucun (À renseigner)"
-                    heroes_summary_list.append(f"{get_icon_emoji(h)} {h} (Pet: {pet_display} | Équipements: {eq_display})")
+                    pet_display = f"{get_icon_emoji(config['pet'])}" if config['pet'] != "Aucun" else ""
+                    eq_display = " ".join([f"{get_icon_emoji(e)}" for e in config['equipment']]) if config['equipment'] else ""
+                    heroes_summary_list.append(f"{get_icon_emoji(h)} {pet_display} {eq_display}")
 
-                troops_display = ", ".join([f"{get_icon_emoji(t)} {t}" for t in selected_troops_comp]) if selected_troops_comp else "Aucune"
-                spells_display = ", ".join([f"🧪 {s}" for s in selected_spells_comp]) if selected_spells_comp else "Aucun"
+                troops_display = " ".join([f"{get_icon_emoji(t)}" for t in selected_troops_comp]) if selected_troops_comp else ""
+                spells_display = " ".join([f"{get_icon_emoji(s)}" for s in selected_spells_comp]) if selected_spells_comp else ""
 
-                comp_details = f"[HDV {comp_th_level}] Héros -> {' / '.join(heroes_summary_list) if heroes_summary_list else 'Aucun'} | Troupes: {troops_display} | Sorts: {spells_display}"
+                comp_details = f"{' '.join(heroes_summary_list)} | {troops_display} | {spells_display}"
                 
                 conn = get_db_client()
                 conn.execute(
                     "INSERT OR REPLACE INTO compositions (comp_name, details, town_hall_level) VALUES (?, ?, ?)", 
                     [comp_title, comp_details, comp_th_level]
                 )
-                st.success(f"Composition '{comp_title}' (HDV {comp_th_level}) enregistrée avec succès !")
+                st.success(f"Composition '{comp_title}' enregistrée avec succès !")
                 st.rerun()
