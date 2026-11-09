@@ -1,5 +1,5 @@
 import streamlit as st
-from utils import init_db, get_all_accounts, fetch_player_data, get_db_favorites, get_db_client
+from utils import init_db, get_all_accounts, fetch_player_data, get_db_favorites, get_db_client, fetch_clan_war_league
 from tabs.tab_config import render_tab_config
 from tabs.tab_overview import render_tab_overview
 from tabs.tab_army import render_tab_army
@@ -10,12 +10,13 @@ st.set_page_config(page_title="CoC Multi-Account Dashboard", page_icon="🛡️"
 # 1. Initialisation de la base de données
 init_db()
 
-# 2. Gestion du verrou global et stockage en session
+# 2. Gestion du verrou global et du chargement complet en amont
 if "app_fully_loaded" not in st.session_state:
     st.session_state["app_fully_loaded"] = False
 
 if not st.session_state["app_fully_loaded"]:
-    with st.spinner("🔄 **Chargement initial bloquant...** Récupération des données API, de la base de données et préparation de tous les onglets."):
+    with st.spinner("🔄 **Chargement complet en cours...** Synchronisation de l'API Clash of Clans, de la base de données, des ligues et des caches."):
+        
         # Récupération des comptes
         accounts = get_all_accounts()
         if not accounts:
@@ -33,7 +34,7 @@ if not st.session_state["app_fully_loaded"]:
 
         st.sidebar.markdown(f"**Pseudo : {player_name} Tag : {current_tag}**")
 
-        # Récupération des données API et stockage en session
+        # Récupération des données API du joueur et stockage en session
         data, error = fetch_player_data(current_tag)
         if error:
             st.error(f"❌ Erreur lors de la récupération des données de l'API : {error}")
@@ -44,7 +45,12 @@ if not st.session_state["app_fully_loaded"]:
         st.session_state["current_tag"] = current_tag
         st.session_state["player_name"] = player_name
 
-        # Préchargement global des emojis et compositions
+        # Préchargement des données de la Ligue de Guerre de Clan (CWL) pour le clan #2U0GCGPJU
+        CLAN_TAG = "#2U0GCGPJU"
+        league_data, league_error = fetch_clan_war_league(CLAN_TAG)
+        st.session_state["cached_league_data"] = league_data
+
+        # Préchargement global des emojis et compositions en mémoire
         conn_db = get_db_client()
         try:
             emoji_res = conn_db.execute("SELECT item_name, emoji FROM custom_emojis")
@@ -58,11 +64,11 @@ if not st.session_state["app_fully_loaded"]:
         except Exception:
             st.session_state["preloaded_compositions"] = []
 
-        # Validation de la fin du chargement
+        # Validation de la fin du chargement global
         st.session_state["app_fully_loaded"] = True
         st.rerun()
 
-# --- 3. AFFICHAGE DE L'INTERFACE (Utilise les données stockées en session) ---
+# --- 3. AFFICHAGE DE L'INTERFACE (Exécuté uniquement lorsque tout est 100% prêt) ---
 st.title("🛡️ Clash of Clans Dashboard — Multi-Comptes")
 
 data = st.session_state.get("cached_player_data", {})
