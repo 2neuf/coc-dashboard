@@ -1,5 +1,5 @@
 import streamlit as st
-from utils import init_db, get_all_accounts, fetch_player_data, get_db_favorites, get_db_client, fetch_clan_war_league
+from utils import init_db, get_all_accounts, fetch_player_data, get_db_favorites, get_db_client, fetch_clan_war_league, sync_league_players_to_db
 from tabs.tab_config import render_tab_config
 from tabs.tab_overview import render_tab_overview
 from tabs.tab_army import render_tab_army
@@ -15,7 +15,7 @@ if "app_fully_loaded" not in st.session_state:
     st.session_state["app_fully_loaded"] = False
 
 if not st.session_state["app_fully_loaded"]:
-    with st.spinner("🔄 **Chargement complet en cours...** Synchronisation de l'API Clash of Clans, de la base de données, des ligues et des caches."):
+    with st.spinner("🔄 **Chargement complet en cours...** Synchronisation de l'API, de la base de données et des profils."):
         
         # Récupération des comptes
         accounts = get_all_accounts()
@@ -45,10 +45,14 @@ if not st.session_state["app_fully_loaded"]:
         st.session_state["current_tag"] = current_tag
         st.session_state["player_name"] = player_name
 
-        # Préchargement des données de la Ligue de Guerre de Clan (CWL) pour le clan #2U0GCGPJU
+        # Préchargement des données de la Ligue de Guerre de Clan (CWL)
         CLAN_TAG = "#2U0GCGPJU"
         league_data, league_error = fetch_clan_war_league(CLAN_TAG)
         st.session_state["cached_league_data"] = league_data
+
+        # Synchronisation automatique des membres de ligue dans la table accounts (une seule fois)
+        if league_data:
+            sync_league_players_to_db(league_data)
 
         # Préchargement global des emojis et compositions en mémoire
         conn_db = get_db_client()
@@ -68,7 +72,7 @@ if not st.session_state["app_fully_loaded"]:
         st.session_state["app_fully_loaded"] = True
         st.rerun()
 
-# --- 3. AFFICHAGE DE L'INTERFACE (Exécuté uniquement lorsque tout est 100% prêt) ---
+# --- 3. AFFICHAGE DE LA PAGE ---
 st.title("🛡️ Clash of Clans Dashboard — Multi-Comptes")
 
 data = st.session_state.get("cached_player_data", {})
