@@ -37,6 +37,12 @@ def init_db():
         except Exception:
             pass
 
+        # Ajout de la colonne pour gérer l'ordre personnalisé des comptes
+        try:
+            conn.execute("ALTER TABLE accounts ADD COLUMN display_order INTEGER DEFAULT 0")
+        except Exception:
+            pass
+
         conn.execute("""
             CREATE TABLE IF NOT EXISTS favorites (
                 item_name TEXT PRIMARY KEY
@@ -72,15 +78,15 @@ def init_db():
         """)
         
         conn.execute("""
-            INSERT OR IGNORE INTO accounts (player_tag, name, town_hall, active_composition) 
-            VALUES (?, ?, ?, ?)
-        """, ["#YJ0U9P89V", "Mini", 18, "Aucune"])
+            INSERT OR IGNORE INTO accounts (player_tag, name, town_hall, active_composition, display_order) 
+            VALUES (?, ?, ?, ?, ?)
+        """, ["#YJ0U9P89V", "Mini", 18, "Aucune", 0])
     except Exception as e:
         st.error(f"Erreur d'initialisation DB : {e}")
 
 def get_all_accounts():
     conn = get_db_client()
-    res = conn.execute("SELECT player_tag, name, town_hall, active_composition FROM accounts")
+    res = conn.execute("SELECT player_tag, name, town_hall, active_composition, display_order FROM accounts ORDER BY display_order ASC, name ASC")
     return [row for row in res.rows]
 
 @st.cache_data(ttl=60)
@@ -133,7 +139,7 @@ def get_icon_emoji(item_name):
         return st.session_state["preloaded_emojis"][item_name]
     
     # Sinon, repli sur ta méthode de secours habituelle
-    return "🛡️"  # ou ton emoji par défaut actuel
+    return "🛡️"
 
 def render_card(name, level, max_level, favorites, emoji="⚔️"):
     is_fav = name in favorites
@@ -210,11 +216,10 @@ def sync_league_players_to_db(league_data):
             for m in w.get(side, {}).get("members", []):
                 m_tag = m.get("tag")
                 m_name = m.get("name")
-                # Insertion si le joueur n'existe pas encore dans accounts
                 try:
                     conn.execute("""
-                        INSERT OR IGNORE INTO accounts (player_tag, name, town_hall, active_composition)
-                        VALUES (?, ?, 18, 'Aucune')
+                        INSERT OR IGNORE INTO accounts (player_tag, name, town_hall, active_composition, display_order)
+                        VALUES (?, ?, 18, 'Aucune', 0)
                     """, [m_tag, m_name])
                 except Exception:
                     pass
