@@ -75,7 +75,7 @@ def init_db():
                 item_name TEXT PRIMARY KEY,
                 emoji TEXT
             )
-        5""")
+        """)
         
         # Initialisation de la table des ligues classées
         init_ranked_leagues_table()
