@@ -205,7 +205,7 @@ def fetch_clan_war_league(clan_tag):
     return None, "Aucune ligue de guerre active trouvée ou erreur API"
 
 def sync_league_players_to_db(league_data):
-    """Enregistre automatiquement les membres du clan trouvés dans la ligue vers la table accounts s'ils n'y sont pas."""
+    """Enregistre automatiquement les membres du clan et leur niveau d'HDV trouvés dans la ligue."""
     if not league_data or not league_data.get("wars"):
         return
     conn = get_db_client()
@@ -216,10 +216,15 @@ def sync_league_players_to_db(league_data):
             for m in w.get(side, {}).get("members", []):
                 m_tag = m.get("tag")
                 m_name = m.get("name")
+                m_th = m.get("townHallLevel", 18) # Récupère le vrai niveau d'HDV du joueur dans la guerre
                 try:
+                    # Insertion ou mise à jour de l'HDV si le joueur existe déjà
                     conn.execute("""
-                        INSERT OR IGNORE INTO accounts (player_tag, name, town_hall, active_composition, display_order)
-                        VALUES (?, ?, 18, 'Aucune', 0)
-                    """, [m_tag, m_name])
+                        INSERT INTO accounts (player_tag, name, town_hall, active_composition, display_order)
+                        VALUES (?, ?, ?, 'Aucune', 0)
+                        ON CONFLICT(player_tag) DO UPDATE SET 
+                            town_hall = excluded.town_hall,
+                            name = excluded.name
+                    """, [m_tag, m_name, m_th])
                 except Exception:
                     pass
