@@ -10,6 +10,7 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
             "🔗 Association des Équipements par Héros",
             "🎨 Personnalisation des Emojis"
         ],
+        index=0,  # Force la sélection sur le paramétrage des compositions par défaut
         horizontal=True,
         label_visibility="collapsed"
     )
