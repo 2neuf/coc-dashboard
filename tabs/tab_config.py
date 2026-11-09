@@ -66,7 +66,6 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
     st.divider()
     st.subheader("⚙️ Paramétrage & Modification des Compositions d'Attaque")
     
-    # Récupérer les compositions existantes
     comps_res = conn_db.execute("SELECT comp_name, town_hall_level, raw_data FROM compositions")
     existing_comps_dict = {}
     for row in comps_res.rows:
@@ -99,7 +98,6 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
     hero_labels = [f"{get_icon_emoji(h)} {h}" for h in available_heroes]
     hero_map = {f"{get_icon_emoji(h)} {h}": h for h in available_heroes}
     
-    # Pré-sélection des héros si on est en mode modification
     default_selected_heroes = edit_data.get("heroes_list", [])
     default_hero_labels = [f"{get_icon_emoji(h)} {h}" for h in default_selected_heroes if h in available_heroes]
 
@@ -115,7 +113,7 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
         raw_troops_for_pets = data.get("troops", [])
         pets_raw_objs = [t for t in raw_troops_for_pets if t.get("name") in HERO_PETS_LIST]
         sorted_pets_objs = sort_items(pets_raw_objs, current_favorites)
-        all_player_pets = [p.get('name'] for p in sorted_pets_objs]
+        all_player_pets = [p.get('name') for p in sorted_pets_objs]
 
         saved_hero_configs = edit_data.get("hero_configs", {})
 
@@ -217,7 +215,6 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
 
                 comp_details = f"{' '.join(heroes_summary_list)} | {troops_display} | {spells_display}"
                 
-                # Structuration JSON pour mémoriser les sélections exactes et les réinjecter lors des modifications futures
                 raw_payload = {
                     "heroes_list": selected_heroes_comp,
                     "hero_configs": hero_custom_links,
@@ -226,7 +223,6 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
                 }
                 
                 conn = get_db_client()
-                # Assurez-vous que la table compositions possède la colonne raw_data (ou l'ajouter si besoin)
                 try:
                     conn.execute("ALTER TABLE compositions ADD COLUMN raw_data TEXT")
                 except Exception:
