@@ -5,7 +5,11 @@ import json
 def render_tab_config(data, current_tag, player_name, current_favorites):
     config_mode = st.radio(
         "Mode de configuration",
-        ["⚙️ Paramétrage des Compositions", "🔗 Association des Équipements par Héros"],
+        [
+            "⚙️ Paramétrage des Compositions", 
+            "🔗 Association des Équipements par Héros",
+            "🎨 Personnalisation des Emojis"
+        ],
         horizontal=True,
         label_visibility="collapsed"
     )
@@ -14,7 +18,56 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
     available_heroes = [h.get('name') for h in data.get("heroes", []) if h.get("village") == "home"]
     all_player_eqs = [e.get('name') for e in data.get("heroEquipment", [])]
 
-    if config_mode == "🔗 Association des Équipements par Héros":
+    if config_mode == "🎨 Personnalisation des Emojis":
+        st.subheader("🎨 Personnalisation globale des Emojis")
+        st.markdown("Modifiez et associez l'emoji de votre choix à n'importe quel élément du jeu.")
+        
+        category = st.selectbox(
+            "Sélectionner une catégorie",
+            ["Héros", "Familiers", "Équipements", "Troupes", "Sorts"]
+        )
+        
+        items_to_edit = []
+        if category == "Héros":
+            items_to_edit = available_heroes
+        elif category == "Familiers":
+            items_to_edit = HERO_PETS_LIST
+        elif category == "Équipements":
+            items_to_edit = all_player_eqs
+        elif category == "Troupes":
+            raw_troops = [t for t in data.get("troops", []) if t.get("village") == "home"]
+            items_to_edit = [t.get("name") for t in raw_troops if t.get("name") not in HERO_PETS_LIST and t.get("name") not in SIEGE_MACHINES_LIST]
+        elif category == "Sorts":
+            raw_spells = [s for s in data.get("spells", []) if s.get("village") == "home"]
+            items_to_edit = [s.get("name") for s in raw_spells]
+            
+        if items_to_edit:
+            with st.form("emojis_form"):
+                new_emojis_dict = {}
+                st.markdown("---")
+                for item in items_to_edit:
+                    current_current_emoji = get_icon_emoji(item)
+                    col_item, col_input = st.columns([0.7, 0.3])
+                    with col_item:
+                        st.markdown(f"**{item}** (Actuel : {current_current_emoji})")
+                    with col_input:
+                        new_emoji = st.text_input(f"Emoji {item}", value=current_current_emoji, key=f"emoji_input_{item}", label_visibility="collapsed")
+                        new_emojis_dict[item] = new_emoji
+                
+                submitted_emojis = st.form_submit_button("Sauvegarder les modifications d'emojis", type="primary")
+                if submitted_emojis:
+                    for item, emoji_val in new_emojis_dict.items():
+                        if emoji_val.strip():
+                            conn_db.execute(
+                                "INSERT OR REPLACE INTO custom_emojis (item_name, emoji) VALUES (?, ?)",
+                                [item, emoji_val.strip()]
+                            )
+                    st.success("Emojis mis à jour avec succès !")
+                    st.rerun()
+        else:
+            st.info("Aucun élément disponible dans cette catégorie pour le moment.")
+
+    elif config_mode == "🔗 Association des Équipements par Héros":
         st.subheader("🛠️ Gestion dynamique : Associer les Équipements aux Héros")
         st.markdown("Utilisez cet espace pour lier manuellement vos équipements à chaque héros de votre choix.")
         
