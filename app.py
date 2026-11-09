@@ -10,11 +10,10 @@ st.set_page_config(page_title="CoC Multi-Account Dashboard", page_icon="🛡️"
 # 1. Initialisation de la base de données
 init_db()
 
-# 2. Gestion d'un verrou global de chargement en session
+# 2. Gestion du verrou global et stockage en session
 if "app_fully_loaded" not in st.session_state:
     st.session_state["app_fully_loaded"] = False
 
-# Si l'application n'a pas fini son cycle complet, on affiche un écran de blocage total
 if not st.session_state["app_fully_loaded"]:
     with st.spinner("🔄 **Chargement initial bloquant...** Récupération des données API, de la base de données et préparation de tous les onglets."):
         # Récupération des comptes
@@ -34,15 +33,18 @@ if not st.session_state["app_fully_loaded"]:
 
         st.sidebar.markdown(f"**Pseudo : {player_name} Tag : {current_tag}**")
 
-        # Récupération des données API (mises en cache)
+        # Récupération des données API et stockage en session
         data, error = fetch_player_data(current_tag)
         if error:
             st.error(f"❌ Erreur lors de la récupération des données de l'API : {error}")
             data = {}
 
-        current_favorites = get_db_favorites()
+        st.session_state["cached_player_data"] = data
+        st.session_state["cached_favorites"] = get_db_favorites()
+        st.session_state["current_tag"] = current_tag
+        st.session_state["player_name"] = player_name
 
-        # Préchargement global des emojis et compositions en mémoire
+        # Préchargement global des emojis et compositions
         conn_db = get_db_client()
         try:
             emoji_res = conn_db.execute("SELECT item_name, emoji FROM custom_emojis")
@@ -56,12 +58,17 @@ if not st.session_state["app_fully_loaded"]:
         except Exception:
             st.session_state["preloaded_compositions"] = []
 
-        # On marque le chargement comme prêt
+        # Validation de la fin du chargement
         st.session_state["app_fully_loaded"] = True
         st.rerun()
 
-# --- 3. AFFICHAGE DE L'INTERFACE (Accessible uniquement une fois tout préchargé) ---
+# --- 3. AFFICHAGE DE L'INTERFACE (Utilise les données stockées en session) ---
 st.title("🛡️ Clash of Clans Dashboard — Multi-Comptes")
+
+data = st.session_state.get("cached_player_data", {})
+current_favorites = st.session_state.get("cached_favorites", [])
+current_tag = st.session_state.get("current_tag", "")
+player_name = st.session_state.get("player_name", "")
 
 tab1, tab2, tab3, tab4 = st.tabs([
     "📊 Vue d'ensemble", 
