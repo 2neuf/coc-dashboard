@@ -16,11 +16,10 @@ def render_tab_overview():
 
     conn = get_db_client()
     
-    # Récupération des comptes triés par display_order actuel
+    # Récupération des comptes triés par display_order incluant town_hall
     accounts_res = conn.execute("SELECT player_tag, name, town_hall, active_composition, display_order FROM accounts ORDER BY display_order ASC, name ASC")
     db_accounts = accounts_res.rows
     
-    # Initialisation de l'ordre en session_state si absent ou si la liste a changé
     if "accounts_order_state" not in st.session_state:
         st.session_state["accounts_order_state"] = [row[0] for row in db_accounts]
     else:
@@ -82,7 +81,6 @@ def render_tab_overview():
                     players_data[p_tag]["days"][day_col] = " | ".join(atk_details)
 
         if players_data:
-            # Tri selon l'ordre en cours dans la session
             sorted_p_tags = sorted(players_data.keys(), key=lambda t: account_order_map.get(t, 999))
             
             df_rows = []
@@ -119,8 +117,6 @@ def render_tab_overview():
         st.divider()
 
         total_accounts = len(ordered_tags)
-        
-        # Tableaux temporaires pour stocker les modifications de position par l'utilisateur
         new_ordered_tags = list(ordered_tags)
 
         for idx, tag in enumerate(ordered_tags):
@@ -132,7 +128,7 @@ def render_tab_overview():
             row_cols = st.columns([1, 0.5, 0.5, 4.5, 1.1, 0.6])
             
             row_cols[0].markdown(f"**{name}**")
-            row_cols[1].markdown(f"TH {th}")
+            row_cols[1].markdown(f"TH {th}")  # Affiche le véritable niveau d'HDV récupéré de la ligue/base
             row_cols[2].markdown("0 🏆")
             
             details_raw = all_comps.get(active_comp, "") if active_comp else ""
@@ -151,7 +147,6 @@ def render_tab_overview():
             
             row_cols[3].markdown(comp_display_text, unsafe_allow_html=True)
             
-            # Saisie directe de la position ou boutons ⬆️ / ⬇️ sans rechargement intempestif
             with row_cols[4]:
                 col_num, col_btns = st.columns([1.3, 1])
                 with col_num:
@@ -164,7 +159,6 @@ def render_tab_overview():
                         key=f"num_pos_{tag}", 
                         label_visibility="collapsed"
                     )
-                    # Mise à jour de l'ordre en mémoire sans forcer de rerun immédiat
                     if new_pos - 1 != idx:
                         target_idx = int(new_pos - 1)
                         if tag in new_ordered_tags:
@@ -215,7 +209,6 @@ def render_tab_overview():
                     st.caption("⚠️")
             st.markdown("---")
 
-        # Bouton unique de validation globale en bas de page
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("💾 **Enregistrer définitivement l'ordre des comptes**", type="primary", use_container_width=True):
             for new_idx, p_tag in enumerate(st.session_state["accounts_order_state"]):
