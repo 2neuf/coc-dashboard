@@ -16,13 +16,23 @@ def render_tab_overview():
 
     conn = get_db_client()
     
-    # Gestion du tri et de la réorganisation par flèches (Montée / Descente)
-    # On récupère tous les comptes triés par leur display_order actuel
+    # 1. Gestion de l'ordre en session_state pour éviter les rechargements intempestifs
     accounts_res = conn.execute("SELECT player_tag, name, town_hall, active_composition, display_order FROM accounts ORDER BY display_order ASC, name ASC")
     db_accounts = accounts_res.rows
     
-    # Dictionnaire d'ordre basé sur les tags pour trier la ligue de la même façon
-    account_order_map = {row[0]: idx for idx, row in enumerate(db_accounts)}
+    # Initialisation de l'ordre en session si absent ou si la liste a changé
+    if "accounts_order_state" not in st.session_state:
+        st.session_state["accounts_order_state"] = [row[0] for row in db_accounts]
+    else:
+        # S'assurer que tous les tags actuels sont bien présents dans l'état
+        current_tags = [row[0] for row in db_accounts]
+        if set(st.session_state["accounts_order_state"]) != set(current_tags):
+            st.session_state["accounts_order_state"] = current_tags
+
+    # Dictionnaire d'accès rapide aux infos des comptes par leur tag
+    accounts_dict = {row[0]: row for row in db_accounts}
+    ordered_tags = st.session_state["accounts_order_state"]
+    account_order_map = {tag: idx for idx, tag in enumerate(ordered_tags)}
 
     if overview_mode == "⚔️ Ligue Overview":
         st.subheader("⚔️ Suivi de la Ligue de Guerre de Clan")
@@ -74,7 +84,7 @@ def render_tab_overview():
                     players_data[p_tag]["days"][day_col] = " | ".join(atk_details)
 
         if players_data:
-            # Tri des joueurs selon l'ordre défini dans account_order_map (les non-inscrits vont à la fin)
+            # Tri selon l'ordre en cours dans la session
             sorted_p_tags = sorted(players_data.keys(), key=lambda t: account_order_map.get(t, 999))
             
             df_rows = []
@@ -110,9 +120,12 @@ def render_tab_overview():
         header_cols[5].markdown("**Action**")
         st.divider()
 
-        total_accounts = len(db_accounts)
-        for idx, acc in enumerate(db_accounts):
-            tag, name, th, active_comp = acc[0], acc[1], acc[2], acc[3]
+        total_accounts = len(ordered_tags)
+        for idx, tag in enumerate(ordered_tags):
+            if tag not in accounts_dict:
+                continue
+            acc = accounts_dict[tag]
+            name, th, active_comp = acc[1], acc[2], acc[3]
             
             row_cols = st.columns([1, 0.5, 0.5, 4.8, 0.8, 0.6])
             
@@ -136,24 +149,20 @@ def render_tab_overview():
             
             row_cols[3].markdown(comp_display_text, unsafe_allow_html=True)
             
-            # Boutons de montée / descente ergonomiques
+            # Boutons de montée / descente en mémoire (sans rafraîchissement immédiat de la base)
             with row_cols[4]:
                 col_up, col_down = st.columns(2)
                 with col_up:
                     if idx > 0:
                         if st.button("⬆️", key=f"up_{tag}", help="Monter"):
-                            # Échanger l'ordre avec le compte précédent
-                            prev_tag = db_accounts[idx - 1][0]
-                            conn.execute("UPDATE accounts SET display_order = ? WHERE player_tag = ?", [idx - 1, tag])
-                            conn.execute("UPDATE accounts SET display_order = ? WHERE player_tag = ?", [idx, prev_tag])
+                            # Inverser dans la liste en session
+                            ordered_tags[idx], ordered_tags[idx - 1] = ordered_tags[idx - 1], ordered_tags[idx]
                             st.rerun()
                 with col_down:
                     if idx < total_accounts - 1:
                         if st.button("⬇️", key=f"down_{tag}", help="Descendre"):
-                            # Échanger l'ordre avec le compte suivant
-                            next_tag = db_accounts[idx + 1][0]
-                            conn.execute("UPDATE accounts SET display_order = ? WHERE player_tag = ?", [idx + 1, tag])
-                            conn.execute("UPDATE accounts SET display_order = ? WHERE player_tag = ?", [idx, next_tag])
+                            # Inverser dans la liste en session
+                            ordered_tags[idx], ordered_tags[idx + 1] = ordered_tags[idx + 1], ordered_tags[idx]
                             st.rerun()
 
             with row_cols[5]:
@@ -183,3 +192,11 @@ def render_tab_overview():
                 else:
                     st.caption("⚠️")
             st.markdown("---")
+
+        # Bouton unique de validation globale en bas de page
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("💾 **Enregistrer définitivement l'ordre des comptes**", type="primary", use_container_width=True):
+            for new_idx, p_tag in enumerate(ordered_tags):
+                conn.execute("UPDATE accounts SET display_order = ? WHERE player_tag = ?", [new_idx, p_tag])
+            st.success("✅ Ordre des comptes enregistré avec succès !")
+            st.rerun()
