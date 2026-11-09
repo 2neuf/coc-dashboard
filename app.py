@@ -1,10 +1,9 @@
 import streamlit as st
 from utils import init_db, get_all_accounts, fetch_player_data, get_db_favorites
 from tabs.tab_config import render_tab_config
-# Importe ici tes autres fichiers d'onglets si tu les as séparés, par exemple :
-# from tabs.tab_overview import render_tab_overview
-# from tabs.tab_heroes import render_tab_heroes
-# from tabs.tab_troops import render_tab_troops
+from tabs.tab_overview import render_tab_overview
+from tabs.tab_heroes import render_tab_heroes
+from tabs.tab_troops import render_tab_troops
 
 st.set_page_config(page_title="CoC Multi-Account Dashboard", page_icon="🛡️", layout="wide")
 
@@ -62,32 +61,13 @@ tab1, tab2, tab3, tab4 = st.tabs([
 ])
 
 with tab1:
-    st.markdown("### Vue d'ensemble du compte")
-    if data:
-        st.write(f"**Hôtel de Ville :** {data.get('townHallLevel', 'N/A')}")
-        st.write(f"**Expérience :** {data.get('expLevel', 'N/A')}")
-        st.write(f"**Trophées :** {data.get('trophies', 'N/A')} 🏆")
-    else:
-        st.info("Données non disponibles.")
+    render_tab_overview(data, current_tag)
 
 with tab2:
-    st.markdown("### Gestion des Héros & Équipements")
-    heroes = data.get("heroes", [])
-    if heroes:
-        for h in heroes:
-            if h.get("village") == "home":
-                st.markdown(f"- **{h.get('name')}** (Niveau {h.get('level')}/{h.get('maxLevel')})")
-    else:
-        st.info("Aucun héros trouvé.")
+    render_tab_heroes(data, current_favorites)
 
 with tab3:
-    st.markdown("### Gestion des Troupes & Sorts")
-    troops = data.get("troops", [])
-    if troops:
-        st.write(f"Total troupes détectées : {len(troops)}")
-    else:
-        st.info("Aucune troupe trouvée.")
+    render_tab_troops(data, current_favorites)
 
 with tab4:
-    # Onglet de configuration avec les 3 modes géré par tab_config.py
     render_tab_config(data, current_tag, player_name, current_favorites)
