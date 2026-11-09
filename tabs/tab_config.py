@@ -186,7 +186,7 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
             st.divider()
 
     st.markdown("### 🧪 Troupes & Sorts de la Compo")
-    raw_troops = [t for t in data.get("troops", []) if t.get("village"] == "home"]
+    raw_troops = [t for t in data.get("troops", []) if t.get("village") == "home"]
     
     def should_exclude(name):
         name_lower = name.lower()
@@ -208,7 +208,7 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
     selected_troop_labels = st.multiselect("Sélectionner les Troupes", troop_labels, default=default_troop_labels, key="troops_multiselect")
     selected_troops_comp = [troop_map[l] for l in selected_troop_labels if l in troop_map]
     
-    spells_raw_objs = [s for s in data.get("spells", []) if s.get("village"] == "home"]
+    spells_raw_objs = [s for s in data.get("spells", []) if s.get("village") == "home"]
     sorted_spells_objs = sort_items(spells_raw_objs, current_favorites)
     available_spells = [s.get('name') for s in sorted_spells_objs]
     
