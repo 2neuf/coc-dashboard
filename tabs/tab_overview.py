@@ -1,5 +1,5 @@
 import streamlit as st
-from utils import get_db_client, update_account_composition
+from utils import get_db_client, update_account_composition, fetch_player_data, sort_items, get_db_favorites, get_icon_emoji
 
 def render_tab_overview():
     st.subheader("📊 Vue d'ensemble de tous les joueurs et Compositions")
@@ -9,37 +9,51 @@ def render_tab_overview():
     accounts_res = conn.execute("SELECT player_tag, name, town_hall, active_composition FROM accounts")
     accounts = accounts_res.rows
     
-    comps_res = conn.execute("SELECT comp_name, town_hall_level FROM compositions")
-    all_comps = comps_res.rows
-    comp_options = [row[0] for row in all_comps]
+    comps_res = conn.execute("SELECT comp_name, details FROM compositions")
+    all_comps = {row[0]: row[1] for row in comps_res.rows}
+    
+    comp_options = list(all_comps.keys())
     
     if not accounts:
         st.info("Aucun compte enregistré.")
         return
 
-    # Disposition des colonnes optimisée et resserrée pour la modification
-    header_cols = st.columns([1.5, 1, 1, 2, 1])
+    # Colonnes asymétriques : la compo actuelle prend le maximum de largeur (5)
+    header_cols = st.columns([1, 0.6, 0.6, 5, 0.8])
     header_cols[0].markdown("**Pseudo**")
     header_cols[1].markdown("**HDV**")
     header_cols[2].markdown("**Ligue**")
-    header_cols[3].markdown("**Compo Actuelle**")
+    header_cols[3].markdown("**Compo Actuelle & Détails**")
     header_cols[4].markdown("**Action**")
     st.divider()
+
+    favorites = get_db_favorites()
 
     for acc in accounts:
         tag, name, th, active_comp = acc[0], acc[1], acc[2], acc[3]
         
-        row_cols = st.columns([1.5, 1, 1, 2, 1])
+        row_cols = st.columns([1, 0.6, 0.6, 5, 0.8])
         
-        # Affichage propre du pseudo sans le tag
         row_cols[0].markdown(f"**{name}**")
         row_cols[1].markdown(f"TH {th}")
         row_cols[2].markdown("0 🏆")
-        row_cols[3].markdown(f":blue[**{active_comp if active_comp else 'Aucune'}**]")
+        
+        # Récupérer les données live du joueur pour analyser les niveaux (héros, troupes, sorts, équipements)
+        p_data, _ = fetch_player_data(tag)
+        
+        comp_display_text = f":blue[**{active_comp}**]"
+        if active_comp in all_comps and p_data:
+            # On peut formater un affichage enrichi et compact sur une seule ligne
+            # Analyse rapide des niveaux pour l'affichage compact
+            details_raw = all_comps[active_comp]
+            comp_display_text = f"**{active_comp}** — <span style='font-size: 0.85em; color: #ccc;'>{details_raw}</span>"
+        elif active_comp == "Aucune" or not active_comp:
+            comp_display_text = ":grey[Aucune composition assignée]"
+
+        row_cols[3].markdown(comp_display_text, unsafe_allow_html=True)
         
         with row_cols[4]:
             if comp_options:
-                # Gestion de l'état d'affichage du sélecteur par compte
                 edit_state_key = f"editing_{tag}"
                 if edit_state_key not in st.session_state:
                     st.session_state[edit_state_key] = False
