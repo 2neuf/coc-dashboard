@@ -204,27 +204,36 @@ def fetch_clan_war_league(clan_tag):
         return None, str(e)
     return None, "Aucune ligue de guerre active trouvée ou erreur API"
 
-def sync_league_players_to_db(league_data):
-    """Enregistre automatiquement les membres du clan et leur niveau d'HDV trouvés dans la ligue."""
-    if not league_data or not league_data.get("wars"):
-        return
+def update_all_accounts_from_api():
+    """Met à jour le nom et l'Hôtel de Ville (TH) exact pour TOUS les comptes de la base via l'API joueur."""
     conn = get_db_client()
-    CLAN_TAG = "#2U0GCGPJU"
-    for w in league_data.get("wars", []):
-        if w and (w.get("clan", {}).get("tag") == CLAN_TAG or w.get("opponent", {}).get("tag") == CLAN_TAG):
-            side = "clan" if w.get("clan", {}).get("tag") == CLAN_TAG else "opponent"
-            for m in w.get(side, {}).get("members", []):
-                m_tag = m.get("tag")
-                m_name = m.get("name")
-                m_th = m.get("townHallLevel", 18) # Récupère le vrai niveau d'HDV du joueur dans la guerre
-                try:
-                    # Insertion ou mise à jour de l'HDV si le joueur existe déjà
-                    conn.execute("""
-                        INSERT INTO accounts (player_tag, name, town_hall, active_composition, display_order)
-                        VALUES (?, ?, ?, 'Aucune', 0)
-                        ON CONFLICT(player_tag) DO UPDATE SET 
-                            town_hall = excluded.town_hall,
-                            name = excluded.name
-                    """, [m_tag, m_name, m_th])
-                except Exception:
-                    pass
+    try:
+        accounts_res = conn.execute("SELECT player_tag FROM accounts")
+        tags = [row[0] for row in accounts_res.rows]
+    except Exception:
+        tags = []
+
+    if not tags:
+        return
+
+    api_token = os.environ.get("COC_API_TOKEN", "")
+    headers = {"Authorization": f"Bearer {api_token}", "Accept": "application/json"}
+
+    for tag in tags:
+        try:
+            formatted_tag = tag.replace("#", "%23")
+            url = f"https://api.clashofclans.com/v1/players/{formatted_tag}"
+            response = requests.get(url, headers=headers)
+            if response.status_code == 200:
+                data = response.json()
+                name = data.get("name")
+                th = data.get("townHallLevel")
+                
+                conn.execute("""
+                    UPDATE accounts 
+                    SET name = ?, town_hall = ? 
+                    WHERE player_tag = ?
+                """, [name, th, tag])
+        except Exception:
+            pass
+                    
