@@ -237,3 +237,54 @@ def update_all_accounts_from_api():
         except Exception:
             pass
                     
+def init_league_archives_table():
+    """Initialise la table pour stocker les archives de ligues par mois."""
+    conn = get_db_client()
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS league_archives (
+                month_key TEXT PRIMARY KEY,
+                wars_json TEXT
+            )
+        """)
+    except Exception:
+        pass
+
+def save_league_archive(month_key, wars_data):
+    """Sauvegarde ou met à jour les données d'une ligue pour un mois donné (ex: 'Novembre')."""
+    import json
+    init_league_archives_table()
+    conn = get_db_client()
+    try:
+        wars_str = json.dumps(wars_data)
+        conn.execute("""
+            INSERT INTO league_archives (month_key, wars_json)
+            VALUES (?, ?)
+            ON CONFLICT(month_key) DO UPDATE SET wars_json = excluded.wars_json
+        """, [month_key, wars_str])
+    except Exception as e:
+        print(f"Erreur sauvegarde archive ligue: {e}")
+
+def get_league_archive(month_key):
+    """Récupère les données d'une ligue archivée pour un mois donné."""
+    import json
+    init_league_archives_table()
+    conn = get_db_client()
+    try:
+        res = conn.execute("SELECT wars_json FROM league_archives WHERE month_key = ?", [month_key])
+        row = res.fetchone()
+        if row and row[0]:
+            return json.loads(row[0])
+    except Exception:
+        pass
+    return None
+
+def get_all_archived_months():
+    """Retourne la liste de tous les mois archivés."""
+    init_league_archives_table()
+    conn = get_db_client()
+    try:
+        res = conn.execute("SELECT month_key FROM league_archives ORDER BY month_key DESC")
+        return [row[0] for row in res.rows]
+    except Exception:
+        return []
