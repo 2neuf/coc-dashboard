@@ -272,11 +272,14 @@ def get_league_archive(month_key):
     conn = get_db_client()
     try:
         res = conn.execute("SELECT wars_json FROM league_archives WHERE month_key = ?", [month_key])
-        row = res.fetchone()
-        if row and row[0]:
-            return json.loads(row[0])
-    except Exception:
-        pass
+        rows = res.rows if hasattr(res, 'rows') else []
+        if rows and rows[0] and rows[0][0]:
+            data = rows[0][0]
+            if isinstance(data, str):
+                return json.loads(data)
+            return data
+    except Exception as e:
+        print(f"Erreur lecture archive: {e}")
     return None
 
 def get_all_archived_months():
