@@ -2,6 +2,22 @@ import streamlit as st
 from utils import get_db_client, get_icon_emoji, sort_items, HERO_PETS_LIST, SIEGE_MACHINES_LIST
 import json
 
+@st.cache_data(ttl=10)
+def get_cached_compositions():
+    conn = get_db_client()
+    try:
+        res = conn.execute("SELECT comp_name, town_hall_level, raw_data, details FROM compositions")
+        return [row for row in res.rows]
+    except Exception:
+        res = conn.execute("SELECT comp_name, town_hall_level, details FROM compositions")
+        return [row for row in res.rows]
+
+@st.cache_data(ttl=10)
+def get_cached_hero_equipment(hero_name):
+    conn = get_db_client()
+    res = conn.execute("SELECT equipment_name FROM hero_equipment_config WHERE hero_name = ?", [hero_name])
+    return [row[0] for row in res.rows]
+
 def render_tab_config(data, current_tag, player_name, current_favorites):
     config_mode = st.radio(
         "Mode de configuration",
@@ -10,7 +26,7 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
             "🔗 Association des Équipements par Héros",
             "🎨 Personnalisation des Emojis"
         ],
-        index=0,  # Force la sélection sur le paramétrage des compositions par défaut
+        index=0,
         horizontal=True,
         label_visibility="collapsed"
     )
@@ -80,8 +96,7 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
 
             def on_hero_change():
                 hero = st.session_state.hero_selector_mapping
-                res_linked = conn_db.execute("SELECT equipment_name FROM hero_equipment_config WHERE hero_name = ?", [hero])
-                already_linked_eqs = [row[0] for row in res_linked.rows]
+                already_linked_eqs = get_cached_hero_equipment(hero)
                 st.session_state.mapping_multiselect = [f"{get_icon_emoji(eq)} {eq}" for eq in already_linked_eqs if eq in all_player_eqs]
 
             selected_hero_to_map = st.selectbox(
@@ -93,8 +108,7 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
 
             multiselect_key = "mapping_multiselect"
             if multiselect_key not in st.session_state:
-                res_linked = conn_db.execute("SELECT equipment_name FROM hero_equipment_config WHERE hero_name = ?", [selected_hero_to_map])
-                already_linked_eqs = [row[0] for row in res_linked.rows]
+                already_linked_eqs = get_cached_hero_equipment(selected_hero_to_map)
                 st.session_state[multiselect_key] = [f"{get_icon_emoji(eq)} {eq}" for eq in already_linked_eqs if eq in all_player_eqs]
 
             res_taken = conn_db.execute("SELECT equipment_name FROM hero_equipment_config WHERE hero_name != ?", [selected_hero_to_map])
@@ -122,6 +136,7 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
                         if label in eq_map:
                             eq_name = eq_map[label]
                             conn_db.execute("INSERT INTO hero_equipment_config (hero_name, equipment_name) VALUES (?, ?)", [selected_hero_to_map, eq_name])
+                    st.cache_data.clear()
                     st.success(f"Association enregistrée pour {selected_hero_to_map} !")
                     st.rerun()
         else:
@@ -130,13 +145,10 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
     else:
         st.subheader("⚙️ Paramétrage & Modification des Compositions d'Attaque")
         
-        try:
-            comps_res = conn_db.execute("SELECT comp_name, town_hall_level, raw_data, details FROM compositions")
-        except Exception:
-            comps_res = conn_db.execute("SELECT comp_name, town_hall_level, details FROM compositions")
+        comps_rows = get_cached_compositions()
 
         existing_comps_dict = {}
-        for row in comps_res.rows:
+        for row in comps_rows:
             comp_name = row[0]
             th_lvl = row[1]
             raw_json = {}
@@ -239,8 +251,7 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
                     pet_choice = available_pets_for_hero[selected_pet_idx]
                 
                 with col_eq:
-                    res_cfg = conn_db.execute("SELECT equipment_name FROM hero_equipment_config WHERE hero_name = ?", [hero])
-                    hero_specific_eqs = [row[0] for row in res_cfg.rows]
+                    hero_specific_eqs = get_cached_hero_equipment(hero)
                     
                     if not hero_specific_eqs:
                         hero_specific_eqs = all_player_eqs
@@ -326,5 +337,6 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
                         "INSERT OR REPLACE INTO compositions (comp_name, details, town_hall_level, raw_data) VALUES (?, ?, ?, ?)", 
                         [comp_title, comp_details, comp_th_level, json.dumps(raw_payload)]
                     )
+                    st.cache_data.clear()
                     st.success(f"Composition '{comp_title}' enregistrée avec succès !")
                     st.rerun()
