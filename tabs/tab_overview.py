@@ -19,37 +19,81 @@ def render_tab_overview():
         
         league_data = st.session_state.get("cached_league_data", None)
         
-        if not league_data or not league_data.get("wars"):
+        if not league_data or not league_data.get("wars") or not league_data.get("group"):
             st.info("⚠️ Aucune donnée de ligue disponible ou active pour ce clan.")
             return
             
-        wars = league_data.get("wars", [])
+        group = league_data.get("group", {})
+        wars_cache = league_data.get("wars", [])
         CLAN_TAG = "#2U0GCGPJU"
         
-        # On filtre et ne garde que les 7 jours de guerre effectifs (on ignore les entrées vides ou de préparation)
-        valid_wars = [w for w in wars if w and w.get("state") != "notInWar"][:7]
+        # Indexons les détails de guerres récupérés par leur tag pour un accès rapide
+        wars_map = {w.get("teamSize"): w for w in wars_cache} # ou via leur tag de guerre si disponible
+        # Plus proprement, associons chaque war_tag des rounds du groupe
+        rounds_info = group.get("rounds", [])
         
+        days_columns = [f"Jour {i+1}" for i in range(len(rounds_info))]
         member_attacks = {}
-        days_columns = [f"Jour {i+1}" for i in range(len(valid_wars))]
         
-        for day_idx, war in enumerate(valid_wars):
-            for side in ["clan", "opponent"]:
-                clan_info = war.get(side, {})
-                if clan_info.get("tag") == CLAN_TAG:
-                    for member in clan_info.get("members", []):
-                        name = member.get("name")
-                        if name not in member_attacks:
-                            member_attacks[name] = {d: "⏳ Non jouée" for d in days_columns}
-                        
-                        attacks = member.get("attacks", [])
-                        if attacks:
-                            atk_details = []
-                            for atk in attacks:
-                                stars = atk.get("stars", 0)
-                                destruction = atk.get("destructionPercentage", 0)
-                                icon = "⭐" if stars > 0 else "❌"
-                                atk_details.append(f"{icon} {stars}★ ({destruction}%)")
-                            member_attacks[name][days_columns[day_idx]] = " | ".join(atk_details)
+        # Parcourir chaque jour (round) de la ligue
+        for day_idx, round_obj in enumerate(rounds_info):
+            day_name = f"Jour {day_idx+1}"
+            war_tags = round_obj.get("warTags", [])
+            
+            # Chercher dans les guerres de ce round celle qui concerne notre clan
+            for war_tag in war_tags:
+                if not war_tag or war_tag == "#0":
+                    continue
+                
+                # Retrouver la guerre correspondante dans le cache ou la requêter/filtrer
+                # Dans notre fetch_clan_war_league, on avait stocké toutes les guerres valides. 
+                # Cherchons la guerre dans la liste globale des wars récupérées :
+                matched_war = None
+                for w in wars_cache:
+                    # Vérifier si notre clan est clan1 ou opponent dans cette guerre
+                    if w.get("clan", {}).get("tag") == CLAN_TAG or w.get("opponent", {}).get("tag") == CLAN_TAG:
+                        # Pour s'assurer que c'est bien le bon round, comparons les tags si l'API le permet, 
+                        # ou vérifions les participants. 
+                        # Plus simple : si la guerre contient notre clan, regardons si elle appartient à ce round.
+                        pass
+                
+                # Approche robuste : On parcourt directement toutes les guerres de la liste 'wars_cache' 
+                # et on les associe par ordre chronologique si elles impliquent notre clan.
+        
+        # Solution directe et ultra-robuste basée sur les guerres de notre clan triées par date de début (startTime)
+        my_clan_wars = []
+        for w in wars_cache:
+            if w and (w.get("clan", {}).get("tag") == CLAN_TAG or w.get("opponent", {}).get("tag") == CLAN_TAG):
+                my_clan_wars.append(w)
+        
+        # Tri des guerres de notre clan par date de début pour l'ordre chronologique des 7 jours
+        my_clan_wars = sorted(my_clan_wars, key=lambda x: x.get("startTime", ""))[:7]
+        
+        actual_days_columns = [f"Jour {i+1}" for i in range(len(my_clan_wars))]
+        
+        for day_idx, war in enumerate(my_clan_wars):
+            day_col = actual_days_columns[day_idx]
+            
+            # Déterminer si notre clan est "clan" ou "opponent" dans cette instance de guerre
+            side = "clan" if war.get("clan", {}).get("tag") == CLAN_TAG else "opponent"
+            clan_info = war.get(side, {})
+            
+            for member in clan_info.get("members", []):
+                name = member.get("name")
+                if name not in member_attacks:
+                    member_attacks[name] = {d: "⏳ Non jouée" for d in actual_days_columns}
+                
+                attacks = member.get("attacks", [])
+                if attacks:
+                    atk_details = []
+                    for atk in attacks:
+                        stars = atk.get("stars", 0)
+                        destruction = atk.get("destructionPercentage", 0)
+                        icon = "⭐" if stars > 0 else "❌"
+                        atk_details.append(f"{icon} {stars}★ ({destruction}%)")
+                    member_attacks[name][day_col] = " | ".join(atk_details)
+                else:
+                    member_attacks[name][day_col] = "⏳ Non jouée"
 
         if member_attacks:
             df_data = []
