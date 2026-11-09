@@ -119,6 +119,10 @@ def render_tab_overview():
         st.divider()
 
         total_accounts = len(ordered_tags)
+        
+        # Tableaux temporaires pour stocker les modifications de position par l'utilisateur
+        new_ordered_tags = list(ordered_tags)
+
         for idx, tag in enumerate(ordered_tags):
             if tag not in accounts_dict:
                 continue
@@ -147,7 +151,7 @@ def render_tab_overview():
             
             row_cols[3].markdown(comp_display_text, unsafe_allow_html=True)
             
-            # Combinaison : Numéro direct + Boutons ⬆️ / ⬇️ en mémoire
+            # Saisie directe de la position ou boutons ⬆️ / ⬇️ sans rechargement intempestif
             with row_cols[4]:
                 col_num, col_btns = st.columns([1.3, 1])
                 with col_num:
@@ -160,23 +164,27 @@ def render_tab_overview():
                         key=f"num_pos_{tag}", 
                         label_visibility="collapsed"
                     )
-                    # Si l'utilisateur modifie directement le chiffre
+                    # Mise à jour de l'ordre en mémoire sans forcer de rerun immédiat
                     if new_pos - 1 != idx:
                         target_idx = int(new_pos - 1)
-                        ordered_tags.pop(idx)
-                        ordered_tags.insert(target_idx, tag)
-                        st.rerun()
+                        if tag in new_ordered_tags:
+                            new_ordered_tags.remove(tag)
+                            new_ordered_tags.insert(target_idx, tag)
+                            st.session_state["accounts_order_state"] = new_ordered_tags
+
                 with col_btns:
                     col_u, col_d = st.columns(2)
                     with col_u:
                         if idx > 0:
                             if st.button("⬆️", key=f"up_{tag}", help="Monter"):
-                                ordered_tags[idx], ordered_tags[idx - 1] = ordered_tags[idx - 1], ordered_tags[idx]
+                                new_ordered_tags[idx], new_ordered_tags[idx - 1] = new_ordered_tags[idx - 1], new_ordered_tags[idx]
+                                st.session_state["accounts_order_state"] = new_ordered_tags
                                 st.rerun()
                     with col_d:
                         if idx < total_accounts - 1:
                             if st.button("⬇️", key=f"down_{tag}", help="Descendre"):
-                                ordered_tags[idx], ordered_tags[idx + 1] = ordered_tags[idx + 1], ordered_tags[idx]
+                                new_ordered_tags[idx], new_ordered_tags[idx + 1] = new_ordered_tags[idx + 1], new_ordered_tags[idx]
+                                st.session_state["accounts_order_state"] = new_ordered_tags
                                 st.rerun()
 
             with row_cols[5]:
@@ -210,7 +218,7 @@ def render_tab_overview():
         # Bouton unique de validation globale en bas de page
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("💾 **Enregistrer définitivement l'ordre des comptes**", type="primary", use_container_width=True):
-            for new_idx, p_tag in enumerate(ordered_tags):
+            for new_idx, p_tag in enumerate(st.session_state["accounts_order_state"]):
                 conn.execute("UPDATE accounts SET display_order = ? WHERE player_tag = ?", [new_idx, p_tag])
             st.success("✅ Ordre des comptes enregistré avec succès !")
             st.rerun()
