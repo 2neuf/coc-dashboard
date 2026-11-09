@@ -26,7 +26,6 @@ def render_tab_overview():
         wars_cache = league_data.get("wars", [])
         CLAN_TAG = "#2U0GCGPJU"
         
-        # Tri des guerres de notre clan par ordre chronologique
         my_clan_wars = []
         for w in wars_cache:
             if w and (w.get("clan", {}).get("tag") == CLAN_TAG or w.get("opponent", {}).get("tag") == CLAN_TAG):
@@ -35,8 +34,6 @@ def render_tab_overview():
         my_clan_wars = sorted(my_clan_wars, key=lambda x: x.get("startTime", ""))[:7]
         actual_days_columns = [f"Jour {i+1}" for i in range(len(my_clan_wars))]
         
-        # Dictionnaire pour regrouper par TAG unique de joueur (et non par son pseudo)
-        # Structure : { player_tag: { "name": dernier_pseudo_connu, "days": { "Jour 1": "...", ... } } }
         players_data = {}
         
         for day_idx, war in enumerate(my_clan_wars):
@@ -54,7 +51,6 @@ def render_tab_overview():
                         "days": {d: "⏳ Non jouée" for d in actual_days_columns}
                     }
                 else:
-                    # Met à jour avec le pseudo le plus récent rencontré
                     players_data[p_tag]["name"] = p_name
                 
                 attacks = member.get("attacks", [])
@@ -80,7 +76,7 @@ def render_tab_overview():
             st.info("Aucun participant trouvé pour cette ligue.")
 
     else:
-        # Vue d'ensemble classique des joueurs et compositions
+        # Mode 1 : Vue d'ensemble simplifiée (lit directement tous les profils enregistrés en base)
         st.subheader("📊 Vue d'ensemble de tous les joueurs et Compositions")
         
         conn = get_db_client()
@@ -105,6 +101,7 @@ def render_tab_overview():
 
         for acc in accounts:
             tag, name, th, active_comp = acc[0], acc[1], acc[2], acc[3]
+            
             row_cols = st.columns([1, 0.5, 0.5, 6, 0.6])
             
             row_cols[0].markdown(f"**{name}**")
