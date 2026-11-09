@@ -184,7 +184,6 @@ def fetch_clan_war_league(clan_tag):
         response = requests.get(url, headers=headers)
         if response.status_code == 200:
             league_group = response.json()
-            # Récupérer les détails des rounds de guerre
             rounds_data = []
             for round_info in league_group.get("rounds", []):
                 for war_tag in round_info.get("warTags", []):
@@ -198,3 +197,24 @@ def fetch_clan_war_league(clan_tag):
     except Exception as e:
         return None, str(e)
     return None, "Aucune ligue de guerre active trouvée ou erreur API"
+
+def sync_league_players_to_db(league_data):
+    """Enregistre automatiquement les membres du clan trouvés dans la ligue vers la table accounts s'ils n'y sont pas."""
+    if not league_data or not league_data.get("wars"):
+        return
+    conn = get_db_client()
+    CLAN_TAG = "#2U0GCGPJU"
+    for w in league_data.get("wars", []):
+        if w and (w.get("clan", {}).get("tag") == CLAN_TAG or w.get("opponent", {}).get("tag") == CLAN_TAG):
+            side = "clan" if w.get("clan", {}).get("tag") == CLAN_TAG else "opponent"
+            for m in w.get(side, {}).get("members", []):
+                m_tag = m.get("tag")
+                m_name = m.get("name")
+                # Insertion si le joueur n'existe pas encore dans accounts
+                try:
+                    conn.execute("""
+                        INSERT OR IGNORE INTO accounts (player_tag, name, town_hall, active_composition)
+                        VALUES (?, ?, 18, 'Aucune')
+                    """, [m_tag, m_name])
+                except Exception:
+                    pass
