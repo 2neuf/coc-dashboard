@@ -98,7 +98,7 @@ def render_tab_overview():
                 row = {"Membre": info["name"]}
                 row.update(info["days"])
                 
-                # Calcul des totaux et moyennes pour les colonnes récapitulatives
+                # Calcul des valeurs
                 t_stars = info["total_stars"]
                 t_dest = info["total_destruction"]
                 atk_cnt = info["attacks_count"]
@@ -106,10 +106,8 @@ def render_tab_overview():
                 avg_stars = round(t_stars / atk_cnt, 2) if atk_cnt > 0 else 0.0
                 avg_dest = round(t_dest / atk_cnt, 1) if atk_cnt > 0 else 0.0
                 
-                row["Total ⭐"] = t_stars
-                row["Total 💥"] = f"{round(t_dest, 1)}%"
-                row["Moy. ⭐ / Atk"] = avg_stars
-                row["Moy. 💥 / Atk"] = f"{avg_dest}%"
+                # Regroupement dans une seule colonne "Total"
+                row["Total"] = f"⭐ {t_stars} | 💥 {round(t_dest, 1)}% (Moy: {avg_stars}★ / {avg_dest}%)"
                 
                 df_rows.append(row)
                 
