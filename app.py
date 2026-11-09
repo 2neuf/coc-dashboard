@@ -6,7 +6,8 @@ from utils import (
     get_db_favorites, 
     get_db_client, 
     fetch_clan_war_league, 
-    update_all_accounts_from_api
+    update_all_accounts_from_api, 
+    save_league_archive
 )
 from tabs.tab_config import render_tab_config
 from tabs.tab_overview import render_tab_overview
@@ -53,10 +54,14 @@ if not st.session_state["app_fully_loaded"]:
         st.session_state["current_tag"] = current_tag
         st.session_state["player_name"] = player_name
 
-        # Préchargement des données de la Ligue de Guerre de Clan (CWL)
+       # Préchargement des données de la Ligue de Guerre de Clan (CWL)
         CLAN_TAG = "#2U0GCGPJU"
         league_data, league_error = fetch_clan_war_league(CLAN_TAG)
         st.session_state["cached_league_data"] = league_data
+
+        # Archivage automatique de la ligue du mois en cours (ex: "Novembre") si l'API renvoie des guerres
+        if league_data and league_data.get("wars"):
+            save_league_archive("Novembre", league_data.get("wars"))
 
         # Mise à jour des informations (HDV réels, pseudos) de tous les comptes enregistrés via l'API joueur
         update_all_accounts_from_api()
