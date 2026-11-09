@@ -66,14 +66,23 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
     st.divider()
     st.subheader("⚙️ Paramétrage & Modification des Compositions d'Attaque")
     
-    comps_res = conn_db.execute("SELECT comp_name, town_hall_level, raw_data FROM compositions")
+    # Requête sécurisée avec vérification des colonnes disponibles
+    try:
+        comps_res = conn_db.execute("SELECT comp_name, town_hall_level, raw_data FROM compositions")
+    except Exception:
+        comps_res = conn_db.execute("SELECT comp_name, town_hall_level FROM compositions")
+
     existing_comps_dict = {}
     for row in comps_res.rows:
-        try:
-            raw_json = json.loads(row[2]) if len(row) > 2 and row[2] else {}
-        except Exception:
-            raw_json = {}
-        existing_comps_dict[row[0]] = {"th": row[1], "raw": raw_json}
+        comp_name = row[0]
+        th_lvl = row[1]
+        raw_json = {}
+        if len(row) > 2 and row[2]:
+            try:
+                raw_json = json.loads(row[2])
+            except Exception:
+                pass
+        existing_comps_dict[comp_name] = {"th": th_lvl, "raw": raw_json}
     
     mode_options = ["➕ Créer une nouvelle composition"] + [f"✏️ Modifier : {c}" for c in existing_comps_dict.keys()]
     selected_mode = st.selectbox("Mode de gestion", mode_options)
@@ -223,11 +232,6 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
                 }
                 
                 conn = get_db_client()
-                try:
-                    conn.execute("ALTER TABLE compositions ADD COLUMN raw_data TEXT")
-                except Exception:
-                    pass
-
                 conn.execute(
                     "INSERT OR REPLACE INTO compositions (comp_name, details, town_hall_level, raw_data) VALUES (?, ?, ?, ?)", 
                     [comp_title, comp_details, comp_th_level, json.dumps(raw_payload)]
