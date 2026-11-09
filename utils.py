@@ -170,3 +170,31 @@ def get_cached_hero_equipment(hero_name):
     conn = get_db_client()
     res = conn.execute("SELECT equipment_name FROM hero_equipment_config WHERE hero_name = ?", [hero_name])
     return [row[0] for row in res.rows]
+
+@st.cache_data(ttl=120)
+def fetch_clan_war_league(clan_tag):
+    api_token = os.environ.get("COC_API_TOKEN", "")
+    formatted_tag = clan_tag.replace("#", "%23")
+    url = f"https://api.clashofclans.com/v1/clans/{formatted_tag}/currentwar/leaguegroup"
+    headers = {
+        "Authorization": f"Bearer {api_token}",
+        "Accept": "application/json"
+    }
+    try:
+        response = requests.get(url, headers=headers)
+        if response.status_code == 200:
+            league_group = response.json()
+            # Récupérer les détails des rounds de guerre
+            rounds_data = []
+            for round_info in league_group.get("rounds", []):
+                for war_tag in round_info.get("warTags", []):
+                    if war_tag and war_tag != "#0":
+                        formatted_war_tag = war_tag.replace("#", "%23")
+                        war_url = f"https://api.clashofclans.com/v1/clanwarleagues/wars/{formatted_war_tag}"
+                        war_resp = requests.get(war_url, headers=headers)
+                        if war_resp.status_code == 200:
+                            rounds_data.append(war_resp.json())
+            return {"group": league_group, "wars": rounds_data}, None
+    except Exception as e:
+        return None, str(e)
+    return None, "Aucune ligue de guerre active trouvée ou erreur API"
