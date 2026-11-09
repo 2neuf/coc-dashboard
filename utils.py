@@ -159,3 +159,19 @@ def render_card(name, level, max_level, favorites, emoji="⚔️"):
 def update_account_composition(player_tag, comp_name):
     conn = get_db_client()
     conn.execute("UPDATE accounts SET active_composition = ? WHERE player_tag = ?", [comp_name, player_tag])
+
+@st.cache_data(ttl=10)
+def get_cached_compositions():
+    conn = get_db_client()
+    try:
+        res = conn.execute("SELECT comp_name, town_hall_level, raw_data, details FROM compositions")
+        return [row for row in res.rows]
+    except Exception:
+        res = conn.execute("SELECT comp_name, town_hall_level, details FROM compositions")
+        return [row for row in res.rows]
+
+@st.cache_data(ttl=10)
+def get_cached_hero_equipment(hero_name):
+    conn = get_db_client()
+    res = conn.execute("SELECT equipment_name FROM hero_equipment_config WHERE hero_name = ?", [hero_name])
+    return [row[0] for row in res.rows]
