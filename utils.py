@@ -43,7 +43,6 @@ def init_db():
             )
         """)
         
-        # Table compositions avec raw_data inclus directement
         conn.execute("""
             CREATE TABLE IF NOT EXISTS compositions (
                 comp_name TEXT PRIMARY KEY,
@@ -52,7 +51,6 @@ def init_db():
                 raw_data TEXT
             )
         """)
-        # Sécurité au cas où la table existait sans raw_data
         try:
             conn.execute("ALTER TABLE compositions ADD COLUMN raw_data TEXT")
         except Exception:
@@ -63,6 +61,14 @@ def init_db():
                 hero_name TEXT,
                 equipment_name TEXT,
                 PRIMARY KEY (hero_name, equipment_name)
+            )
+        """)
+
+        # Table pour stocker les emojis personnalisés de tous les éléments
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS custom_emojis (
+                item_name TEXT PRIMARY KEY,
+                emoji TEXT
             )
         """)
         
@@ -110,6 +116,15 @@ def sort_items(items_list, favorites):
     return sorted(items_list, key=sort_key)
 
 def get_icon_emoji(name):
+    # Vérifie d'abord si un emoji personnalisé existe en base de données
+    try:
+        conn = get_db_client()
+        res = conn.execute("SELECT emoji FROM custom_emojis WHERE item_name = ?", [name])
+        if res.rows:
+            return res.rows[0][0]
+    except Exception:
+        pass
+
     icons = {
         "Barbarian King": "👑", "Archer Queen": "🏹", "Grand Warden": "🧙‍♂️", "Royal Champion": "🛡️", "Minion Prince": "🦇",
         "L.A.S.S.I": "🐶", "Mighty Yak": "🐂", "Electro Owl": "🦉", "Unicorn": "🦄", 
