@@ -14,6 +14,14 @@ def render_tab_overview():
         label_visibility="collapsed"
     )
 
+    # Récupération ordonnée des comptes enregistrés en base (détermine l'ordre maître)
+    conn = get_db_client()
+    accounts_res = conn.execute("SELECT player_tag, name, town_hall, active_composition, display_order FROM accounts ORDER BY display_order ASC, name ASC")
+    db_accounts = accounts_res.rows
+    
+    # Dictionnaire d'ordre basé sur les tags pour trier la ligue de la même façon
+    account_order_map = {row[0]: idx for idx, row in enumerate(db_accounts)}
+
     if overview_mode == "⚔️ Ligue Overview":
         st.subheader("⚔️ Suivi de la Ligue de Guerre de Clan")
         
@@ -64,8 +72,12 @@ def render_tab_overview():
                     players_data[p_tag]["days"][day_col] = " | ".join(atk_details)
 
         if players_data:
+            # Tri des joueurs selon l'ordre défini dans account_order_map (les non-inscrits vont à la fin)
+            sorted_p_tags = sorted(players_data.keys(), key=lambda t: account_order_map.get(t, 999))
+            
             df_rows = []
-            for p_tag, info in players_data.items():
+            for p_tag in sorted_p_tags:
+                info = players_data[p_tag]
                 row = {"Membre": info["name"]}
                 row.update(info["days"])
                 df_rows.append(row)
@@ -76,33 +88,30 @@ def render_tab_overview():
             st.info("Aucun participant trouvé pour cette ligue.")
 
     else:
-        # Mode 1 : Vue d'ensemble simplifiée (lit directement tous les profils enregistrés en base)
+        # Mode 1 : Vue d'ensemble de tous les joueurs et Compositions
         st.subheader("📊 Vue d'ensemble de tous les joueurs et Compositions")
-        
-        conn = get_db_client()
-        accounts_res = conn.execute("SELECT player_tag, name, town_hall, active_composition FROM accounts")
-        accounts = accounts_res.rows
         
         comps_res = conn.execute("SELECT comp_name, details FROM compositions")
         all_comps = {row[0]: row[1] for row in comps_res.rows}
         comp_options = list(all_comps.keys())
         
-        if not accounts:
+        if not db_accounts:
             st.info("Aucun compte enregistré.")
             return
 
-        header_cols = st.columns([1, 0.5, 0.5, 6, 0.6])
+        header_cols = st.columns([1, 0.5, 0.5, 5, 0.6, 0.6])
         header_cols[0].markdown("**Pseudo**")
         header_cols[1].markdown("**HDV**")
         header_cols[2].markdown("**Ligue**")
         header_cols[3].markdown("**Composition Active**")
-        header_cols[4].markdown("**Action**")
+        header_cols[4].markdown("**Ordre**")
+        header_cols[5].markdown("**Action**")
         st.divider()
 
-        for acc in accounts:
-            tag, name, th, active_comp = acc[0], acc[1], acc[2], acc[3]
+        for acc in db_accounts:
+            tag, name, th, active_comp, current_order = acc[0], acc[1], acc[2], acc[3], acc[4]
             
-            row_cols = st.columns([1, 0.5, 0.5, 6, 0.6])
+            row_cols = st.columns([1, 0.5, 0.5, 5, 0.6, 0.6])
             
             row_cols[0].markdown(f"**{name}**")
             row_cols[1].markdown(f"TH {th}")
@@ -124,7 +133,14 @@ def render_tab_overview():
             
             row_cols[3].markdown(comp_display_text, unsafe_allow_html=True)
             
+            # Champ pour modifier rapidement l'ordre d'affichage de chaque compte
             with row_cols[4]:
+                new_order = st.number_input("Ordre", value=int(current_order or 0), step=1, key=f"order_{tag}", label_visibility="collapsed")
+                if new_order != current_order:
+                    conn.execute("UPDATE accounts SET display_order = ? WHERE player_tag = ?", [new_order, tag])
+                    st.rerun()
+
+            with row_cols[5]:
                 if comp_options:
                     edit_state_key = f"editing_{tag}"
                     if edit_state_key not in st.session_state:
