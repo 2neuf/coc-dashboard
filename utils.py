@@ -64,7 +64,6 @@ def init_db():
             )
         """)
 
-        # Table pour stocker les emojis personnalisés
         conn.execute("""
             CREATE TABLE IF NOT EXISTS custom_emojis (
                 item_name TEXT PRIMARY KEY,
@@ -84,6 +83,7 @@ def get_all_accounts():
     res = conn.execute("SELECT player_tag, name, town_hall, active_composition FROM accounts")
     return [row for row in res.rows]
 
+@st.cache_data(ttl=60)
 def fetch_player_data(player_tag):
     api_token = os.environ.get("COC_API_TOKEN", "")
     formatted_tag = player_tag.replace("#", "%23")
@@ -115,7 +115,9 @@ def sort_items(items_list, favorites):
         return (is_fav, diff, -level)
     return sorted(items_list, key=sort_key)
 
-def get_icon_emoji(name):
+# Cache des emojis personnalisés pour éviter les requêtes DB à chaque affichage d'icône
+@st.cache_data(ttl=10)
+def _get_cached_custom_emoji(name):
     try:
         conn = get_db_client()
         res = conn.execute("SELECT emoji FROM custom_emojis WHERE item_name = ?", [name])
@@ -123,6 +125,12 @@ def get_icon_emoji(name):
             return res.rows[0][0]
     except Exception:
         pass
+    return None
+
+def get_icon_emoji(name):
+    custom = _get_cached_custom_emoji(name)
+    if custom:
+        return custom
 
     icons = {
         "Barbarian King": "👑", "Archer Queen": "🏹", "Grand Warden": "🧙‍♂️", "Royal Champion": "🛡️", "Minion Prince": "🦇",
