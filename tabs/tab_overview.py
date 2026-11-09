@@ -14,8 +14,10 @@ def render_tab_overview():
         label_visibility="collapsed"
     )
 
-    # Récupération ordonnée des comptes enregistrés en base (détermine l'ordre maître)
     conn = get_db_client()
+    
+    # Gestion du tri et de la réorganisation par flèches (Montée / Descente)
+    # On récupère tous les comptes triés par leur display_order actuel
     accounts_res = conn.execute("SELECT player_tag, name, town_hall, active_composition, display_order FROM accounts ORDER BY display_order ASC, name ASC")
     db_accounts = accounts_res.rows
     
@@ -99,7 +101,7 @@ def render_tab_overview():
             st.info("Aucun compte enregistré.")
             return
 
-        header_cols = st.columns([1, 0.5, 0.5, 5, 0.6, 0.6])
+        header_cols = st.columns([1, 0.5, 0.5, 4.8, 0.8, 0.6])
         header_cols[0].markdown("**Pseudo**")
         header_cols[1].markdown("**HDV**")
         header_cols[2].markdown("**Ligue**")
@@ -108,10 +110,11 @@ def render_tab_overview():
         header_cols[5].markdown("**Action**")
         st.divider()
 
-        for acc in db_accounts:
-            tag, name, th, active_comp, current_order = acc[0], acc[1], acc[2], acc[3], acc[4]
+        total_accounts = len(db_accounts)
+        for idx, acc in enumerate(db_accounts):
+            tag, name, th, active_comp = acc[0], acc[1], acc[2], acc[3]
             
-            row_cols = st.columns([1, 0.5, 0.5, 5, 0.6, 0.6])
+            row_cols = st.columns([1, 0.5, 0.5, 4.8, 0.8, 0.6])
             
             row_cols[0].markdown(f"**{name}**")
             row_cols[1].markdown(f"TH {th}")
@@ -133,12 +136,25 @@ def render_tab_overview():
             
             row_cols[3].markdown(comp_display_text, unsafe_allow_html=True)
             
-            # Champ pour modifier rapidement l'ordre d'affichage de chaque compte
+            # Boutons de montée / descente ergonomiques
             with row_cols[4]:
-                new_order = st.number_input("Ordre", value=int(current_order or 0), step=1, key=f"order_{tag}", label_visibility="collapsed")
-                if new_order != current_order:
-                    conn.execute("UPDATE accounts SET display_order = ? WHERE player_tag = ?", [new_order, tag])
-                    st.rerun()
+                col_up, col_down = st.columns(2)
+                with col_up:
+                    if idx > 0:
+                        if st.button("⬆️", key=f"up_{tag}", help="Monter"):
+                            # Échanger l'ordre avec le compte précédent
+                            prev_tag = db_accounts[idx - 1][0]
+                            conn.execute("UPDATE accounts SET display_order = ? WHERE player_tag = ?", [idx - 1, tag])
+                            conn.execute("UPDATE accounts SET display_order = ? WHERE player_tag = ?", [idx, prev_tag])
+                            st.rerun()
+                with col_down:
+                    if idx < total_accounts - 1:
+                        if st.button("⬇️", key=f"down_{tag}", help="Descendre"):
+                            # Échanger l'ordre avec le compte suivant
+                            next_tag = db_accounts[idx + 1][0]
+                            conn.execute("UPDATE accounts SET display_order = ? WHERE player_tag = ?", [idx + 1, tag])
+                            conn.execute("UPDATE accounts SET display_order = ? WHERE player_tag = ?", [idx, next_tag])
+                            st.rerun()
 
             with row_cols[5]:
                 if comp_options:
