@@ -16,20 +16,18 @@ def render_tab_overview():
 
     conn = get_db_client()
     
-    # 1. Gestion de l'ordre en session_state pour éviter les rechargements intempestifs
+    # Récupération des comptes triés par display_order actuel
     accounts_res = conn.execute("SELECT player_tag, name, town_hall, active_composition, display_order FROM accounts ORDER BY display_order ASC, name ASC")
     db_accounts = accounts_res.rows
     
-    # Initialisation de l'ordre en session si absent ou si la liste a changé
+    # Initialisation de l'ordre en session_state si absent ou si la liste a changé
     if "accounts_order_state" not in st.session_state:
         st.session_state["accounts_order_state"] = [row[0] for row in db_accounts]
     else:
-        # S'assurer que tous les tags actuels sont bien présents dans l'état
         current_tags = [row[0] for row in db_accounts]
         if set(st.session_state["accounts_order_state"]) != set(current_tags):
             st.session_state["accounts_order_state"] = current_tags
 
-    # Dictionnaire d'accès rapide aux infos des comptes par leur tag
     accounts_dict = {row[0]: row for row in db_accounts}
     ordered_tags = st.session_state["accounts_order_state"]
     account_order_map = {tag: idx for idx, tag in enumerate(ordered_tags)}
@@ -111,7 +109,7 @@ def render_tab_overview():
             st.info("Aucun compte enregistré.")
             return
 
-        header_cols = st.columns([1, 0.5, 0.5, 4.8, 0.8, 0.6])
+        header_cols = st.columns([1, 0.5, 0.5, 4.5, 1.1, 0.6])
         header_cols[0].markdown("**Pseudo**")
         header_cols[1].markdown("**HDV**")
         header_cols[2].markdown("**Ligue**")
@@ -127,7 +125,7 @@ def render_tab_overview():
             acc = accounts_dict[tag]
             name, th, active_comp = acc[1], acc[2], acc[3]
             
-            row_cols = st.columns([1, 0.5, 0.5, 4.8, 0.8, 0.6])
+            row_cols = st.columns([1, 0.5, 0.5, 4.5, 1.1, 0.6])
             
             row_cols[0].markdown(f"**{name}**")
             row_cols[1].markdown(f"TH {th}")
@@ -149,21 +147,37 @@ def render_tab_overview():
             
             row_cols[3].markdown(comp_display_text, unsafe_allow_html=True)
             
-            # Boutons de montée / descente en mémoire (sans rafraîchissement immédiat de la base)
+            # Combinaison : Numéro direct + Boutons ⬆️ / ⬇️ en mémoire
             with row_cols[4]:
-                col_up, col_down = st.columns(2)
-                with col_up:
-                    if idx > 0:
-                        if st.button("⬆️", key=f"up_{tag}", help="Monter"):
-                            # Inverser dans la liste en session
-                            ordered_tags[idx], ordered_tags[idx - 1] = ordered_tags[idx - 1], ordered_tags[idx]
-                            st.rerun()
-                with col_down:
-                    if idx < total_accounts - 1:
-                        if st.button("⬇️", key=f"down_{tag}", help="Descendre"):
-                            # Inverser dans la liste en session
-                            ordered_tags[idx], ordered_tags[idx + 1] = ordered_tags[idx + 1], ordered_tags[idx]
-                            st.rerun()
+                col_num, col_btns = st.columns([1.3, 1])
+                with col_num:
+                    new_pos = st.number_input(
+                        "Pos", 
+                        min_value=1, 
+                        max_value=total_accounts, 
+                        value=idx + 1, 
+                        step=1, 
+                        key=f"num_pos_{tag}", 
+                        label_visibility="collapsed"
+                    )
+                    # Si l'utilisateur modifie directement le chiffre
+                    if new_pos - 1 != idx:
+                        target_idx = int(new_pos - 1)
+                        ordered_tags.pop(idx)
+                        ordered_tags.insert(target_idx, tag)
+                        st.rerun()
+                with col_btns:
+                    col_u, col_d = st.columns(2)
+                    with col_u:
+                        if idx > 0:
+                            if st.button("⬆️", key=f"up_{tag}", help="Monter"):
+                                ordered_tags[idx], ordered_tags[idx - 1] = ordered_tags[idx - 1], ordered_tags[idx]
+                                st.rerun()
+                    with col_d:
+                        if idx < total_accounts - 1:
+                            if st.button("⬇️", key=f"down_{tag}", help="Descendre"):
+                                ordered_tags[idx], ordered_tags[idx + 1] = ordered_tags[idx + 1], ordered_tags[idx]
+                                st.rerun()
 
             with row_cols[5]:
                 if comp_options:
