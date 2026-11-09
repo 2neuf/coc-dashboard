@@ -67,20 +67,27 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
     st.subheader("⚙️ Paramétrage & Modification des Compositions d'Attaque")
     
     try:
-        comps_res = conn_db.execute("SELECT comp_name, town_hall_level, raw_data FROM compositions")
+        comps_res = conn_db.execute("SELECT comp_name, town_hall_level, raw_data, details FROM compositions")
     except Exception:
-        comps_res = conn_db.execute("SELECT comp_name, town_hall_level FROM compositions")
+        comps_res = conn_db.execute("SELECT comp_name, town_hall_level, details FROM compositions")
 
     existing_comps_dict = {}
     for row in comps_res.rows:
         comp_name = row[0]
         th_lvl = row[1]
         raw_json = {}
+        
+        # Si raw_data existe et n'est pas vide
         if len(row) > 2 and row[2]:
             try:
                 raw_json = json.loads(row[2])
             except Exception:
                 pass
+        
+        # Fallback de secours intelligent si raw_data est vide mais qu'on a le nom de la compo
+        if not raw_json and comp_name:
+            raw_json = {"heroes_list": available_heroes, "hero_configs": {}, "troops": [], "spells": []}
+
         existing_comps_dict[comp_name] = {"th": th_lvl, "raw": raw_json}
     
     mode_options = ["➕ Créer une nouvelle composition"] + [f"✏️ Modifier : {c}" for c in existing_comps_dict.keys()]
@@ -90,20 +97,16 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
 
     selected_mode = st.selectbox("Mode de gestion", mode_options, key="selected_mode_box")
     
+    # Forcer la réinitialisation des widgets au changement de mode
     if st.session_state.prev_selected_mode != selected_mode:
         st.session_state.prev_selected_mode = selected_mode
         target_name = selected_mode.replace("✏️ Modifier : ", "") if "✏️ Modifier :" in selected_mode else ""
         comp_info = existing_comps_dict.get(target_name, {"th": 18, "raw": {}})
         edit_data = comp_info.get("raw", {})
         
-        default_selected_heroes = edit_data.get("heroes_list", [])
-        st.session_state["hero_multiselect"] = [f"{get_icon_emoji(h)} {h}" for h in default_selected_heroes if h in available_heroes]
-        
-        default_troops = edit_data.get("troops", [])
-        st.session_state["troops_multiselect"] = [f"{get_icon_emoji(t)} {t}" for t in default_troops]
-        
-        default_spells = edit_data.get("spells", [])
-        st.session_state["spells_multiselect"] = [f"{get_icon_emoji(s)} {s}" for s in default_spells]
+        st.session_state["hero_multiselect"] = [f"{get_icon_emoji(h)} {h}" for h in edit_data.get("heroes_list", []) if h in available_heroes]
+        st.session_state["troops_multiselect"] = [f"{get_icon_emoji(t)} {t}" for t in edit_data.get("troops", [])]
+        st.session_state["spells_multiselect"] = [f"{get_icon_emoji(s)} {s}" for s in edit_data.get("spells", [])]
         st.rerun()
 
     default_comp_name = ""
