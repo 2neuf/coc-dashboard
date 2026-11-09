@@ -7,7 +7,7 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
     st.markdown("Utilisez cet espace pour lier manuellement vos équipements à chaque héros de votre choix.")
     
     conn_db = get_db_client()
-    available_heroes = [h.get('name') for h in data.get("heroes", []) if h.get("village") == "home"]
+    available_heroes = [h.get('name') for h in data.get("heroes", []) if h.get("village"] == "home"]
     all_player_eqs = [e.get('name') for e in data.get("heroEquipment", [])]
     
     if available_heroes and all_player_eqs:
@@ -66,7 +66,6 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
     st.divider()
     st.subheader("⚙️ Paramétrage & Modification des Compositions d'Attaque")
     
-    # Requête sécurisée avec vérification des colonnes disponibles
     try:
         comps_res = conn_db.execute("SELECT comp_name, town_hall_level, raw_data FROM compositions")
     except Exception:
@@ -85,8 +84,29 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
         existing_comps_dict[comp_name] = {"th": th_lvl, "raw": raw_json}
     
     mode_options = ["➕ Créer une nouvelle composition"] + [f"✏️ Modifier : {c}" for c in existing_comps_dict.keys()]
-    selected_mode = st.selectbox("Mode de gestion", mode_options)
     
+    if "prev_selected_mode" not in st.session_state:
+        st.session_state.prev_selected_mode = mode_options[0]
+
+    selected_mode = st.selectbox("Mode de gestion", mode_options, key="selected_mode_box")
+    
+    # Synchronisation instantanée du session_state des multiselects lors du changement de mode
+    if st.session_state.prev_selected_mode != selected_mode:
+        st.session_state.prev_selected_mode = selected_mode
+        target_name = selected_mode.replace("✏️ Modifier : ", "") if "✏️ Modifier :" in selected_mode else ""
+        comp_info = existing_comps_dict.get(target_name, {"th": 18, "raw": {}})
+        edit_data = comp_info.get("raw", {})
+        
+        default_selected_heroes = edit_data.get("heroes_list", [])
+        st.session_state["hero_multiselect"] = [f"{get_icon_emoji(h)} {h}" for h in default_selected_heroes if h in available_heroes]
+        
+        default_troops = edit_data.get("troops", [])
+        st.session_state["troops_multiselect"] = [f"{get_icon_emoji(t)} {t}" for t in default_troops]
+        
+        default_spells = edit_data.get("spells", [])
+        st.session_state["spells_multiselect"] = [f"{get_icon_emoji(s)} {s}" for s in default_spells]
+        st.rerun()
+
     default_comp_name = ""
     default_th = 18
     edit_data = {}
@@ -100,7 +120,7 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
 
     col_t1, col_t2 = st.columns([0.75, 0.25])
     with col_t1:
-        comp_title = st.text_input("Nom de la composition", value=default_comp_name)
+        comp_title = st.text_input("Nom de la composition", value=default_comp_name, key="comp_title_input")
     with col_t2:
         comp_th_level = st.selectbox("Niveau HDV cible", [18, 17, 16, 15], index=[18, 17, 16, 15].index(default_th) if default_th in [18, 17, 16, 15] else 0, key="comp_th_selector")
     
@@ -111,7 +131,7 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
     default_hero_labels = [f"{get_icon_emoji(h)} {h}" for h in default_selected_heroes if h in available_heroes]
 
     selected_hero_labels = st.multiselect("Choisissez les héros à inclure dans la compo", hero_labels, default=default_hero_labels, key="hero_multiselect")
-    selected_heroes_comp = [hero_map[l] for l in selected_hero_labels]
+    selected_heroes_comp = [hero_map[l] for l in selected_hero_labels if l in hero_map]
     
     hero_custom_links = {}
 
@@ -161,7 +181,7 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
                 default_eq_labels = [f"{get_icon_emoji(e)} {e}" for e in saved_eqs if e in hero_specific_eqs]
 
                 selected_eq_labels = st.multiselect(f"Équipements pour {hero} (max 2)", eq_labels_hero, default=default_eq_labels, key=f"eq_{hero}")
-                eq_choices = [eq_map_hero[label] for label in selected_eq_labels]
+                eq_choices = [eq_map_hero[label] for label in selected_eq_labels if label in eq_map_hero]
             
             hero_custom_links[hero] = {"pet": pet_choice, "equipment": eq_choices}
             st.divider()
@@ -187,7 +207,7 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
     default_troop_labels = [f"{get_icon_emoji(t)} {t}" for t in default_troops if t in available_troops]
 
     selected_troop_labels = st.multiselect("Sélectionner les Troupes", troop_labels, default=default_troop_labels, key="troops_multiselect")
-    selected_troops_comp = [troop_map[l] for l in selected_troop_labels]
+    selected_troops_comp = [troop_map[l] for l in selected_troop_labels if l in troop_map]
     
     spells_raw_objs = [s for s in data.get("spells", []) if s.get("village") == "home"]
     sorted_spells_objs = sort_items(spells_raw_objs, current_favorites)
@@ -200,7 +220,7 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
     default_spell_labels = [f"{get_icon_emoji(s)} {s}" for s in default_spells if s in available_spells]
 
     selected_spell_labels = st.multiselect("Sélectionner les Sorts", spell_labels, default=default_spell_labels, key="spells_multiselect")
-    selected_spells_comp = [spell_map[l] for l in selected_spell_labels]
+    selected_spells_comp = [spell_map[l] for l in selected_spell_labels if l in spell_map]
     
     if st.button("Enregistrer / Mettre à jour la composition", type="primary"):
         if not comp_title:
