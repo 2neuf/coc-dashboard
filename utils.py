@@ -75,8 +75,11 @@ def init_db():
                 item_name TEXT PRIMARY KEY,
                 emoji TEXT
             )
-        """)
+        5""")
         
+        # Initialisation de la table des ligues classées
+        init_ranked_leagues_table()
+
         conn.execute("""
             INSERT OR IGNORE INTO accounts (player_tag, name, town_hall, active_composition, display_order) 
             VALUES (?, ?, ?, ?, ?)
@@ -307,7 +310,7 @@ def init_ranked_leagues_table():
                 stars_2 INTEGER DEFAULT 0,
                 stars_1 INTEGER DEFAULT 0,
                 avg_destruction REAL DEFAULT 0.0,
-def_done INTEGER DEFAULT 0,
+                def_done INTEGER DEFAULT 0,
                 def_max INTEGER DEFAULT 8,
                 trophies_attack INTEGER DEFAULT 0,
                 trophies_defense INTEGER DEFAULT 0,
