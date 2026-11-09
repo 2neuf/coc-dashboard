@@ -39,7 +39,7 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
             raw_troops = [t for t in data.get("troops", []) if t.get("village") == "home"]
             items_to_edit = [t.get("name") for t in raw_troops if t.get("name") not in HERO_PETS_LIST and t.get("name") not in SIEGE_MACHINES_LIST]
         elif category == "Sorts":
-            raw_spells = [s for s in data.get("spells", []) if s.get("village"] == "home"]
+            raw_spells = [s for s in data.get("spells", []) if s.get("village") == "home"]
             items_to_edit = [s.get("name") for s in raw_spells]
             
         if items_to_edit:
@@ -63,7 +63,7 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
                                 "INSERT OR REPLACE INTO custom_emojis (item_name, emoji) VALUES (?, ?)",
                                 [item, emoji_val.strip()]
                             )
-                    st.cache_data.clear()  # Efface le cache pour actualiser instantanément les icônes
+                    st.cache_data.clear()
                     st.success("Emojis mis à jour avec succès !")
                     st.rerun()
         else:
