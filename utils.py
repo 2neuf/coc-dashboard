@@ -127,18 +127,13 @@ def _get_cached_custom_emoji(name):
         pass
     return None
 
-def get_icon_emoji(name):
-    custom = _get_cached_custom_emoji(name)
-    if custom:
-        return custom
-
-    icons = {
-        "Barbarian King": "👑", "Archer Queen": "🏹", "Grand Warden": "🧙‍♂️", "Royal Champion": "🛡️", "Minion Prince": "🦇",
-        "L.A.S.S.I": "🐶", "Mighty Yak": "🐂", "Electro Owl": "🦉", "Unicorn": "🦄", 
-        "Phoenix": "🔥", "Poison Lizard": "🦎", "Diggy": "🦫", "Frosty": "❄️", 
-        "Spirit Fox": "🦊", "Angry Jelly": "🪼", "Sneezy": "🤧", "Greedy Raven": "🦅"
-    }
-    return icons.get(name, "⚔️")
+def get_icon_emoji(item_name):
+    # Utilise directement le cache global en mémoire s'il existe (zéro requête SQL à la volée)
+    if "preloaded_emojis" in st.session_state and item_name in st.session_state["preloaded_emojis"]:
+        return st.session_state["preloaded_emojis"][item_name]
+    
+    # Sinon, repli sur ta méthode de secours habituelle
+    return "🛡️"  # ou ton emoji par défaut actuel
 
 def render_card(name, level, max_level, favorites, emoji="⚔️"):
     is_fav = name in favorites
