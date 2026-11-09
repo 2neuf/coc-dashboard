@@ -76,17 +76,23 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
         comp_name = row[0]
         th_lvl = row[1]
         raw_json = {}
+        details_text = row[3] if len(row) > 3 and row[3] else (row[2] if len(row) > 2 and not row[2].startswith("{") else "")
         
-        # Si raw_data existe et n'est pas vide
-        if len(row) > 2 and row[2]:
+        if len(row) > 2 and row[2] and row[2].startswith("{"):
             try:
                 raw_json = json.loads(row[2])
             except Exception:
                 pass
         
-        # Fallback de secours intelligent si raw_data est vide mais qu'on a le nom de la compo
-        if not raw_json and comp_name:
-            raw_json = {"heroes_list": available_heroes, "hero_configs": {}, "troops": [], "spells": []}
+        # Si pas de raw_json mais qu'on a le texte details, on reconstruit intelligemment les éléments pour l'édition
+        if not raw_json:
+            found_heroes = [h for h in available_heroes if h in details_text or get_icon_emoji(h) in details_text]
+            raw_json = {
+                "heroes_list": found_heroes if found_heroes else available_heroes,
+                "hero_configs": {},
+                "troops": [],
+                "spells": []
+            }
 
         existing_comps_dict[comp_name] = {"th": th_lvl, "raw": raw_json}
     
@@ -97,13 +103,13 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
 
     selected_mode = st.selectbox("Mode de gestion", mode_options, key="selected_mode_box")
     
-    # Forcer la réinitialisation des widgets au changement de mode
     if st.session_state.prev_selected_mode != selected_mode:
         st.session_state.prev_selected_mode = selected_mode
         target_name = selected_mode.replace("✏️ Modifier : ", "") if "✏️ Modifier :" in selected_mode else ""
         comp_info = existing_comps_dict.get(target_name, {"th": 18, "raw": {}})
         edit_data = comp_info.get("raw", {})
         
+        st.session_state["comp_title_input"] = target_name
         st.session_state["hero_multiselect"] = [f"{get_icon_emoji(h)} {h}" for h in edit_data.get("heroes_list", []) if h in available_heroes]
         st.session_state["troops_multiselect"] = [f"{get_icon_emoji(t)} {t}" for t in edit_data.get("troops", [])]
         st.session_state["spells_multiselect"] = [f"{get_icon_emoji(s)} {s}" for s in edit_data.get("spells", [])]
