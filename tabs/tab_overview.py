@@ -17,7 +17,6 @@ def render_tab_overview():
     if overview_mode == "⚔️ Ligue Overview":
         st.subheader("⚔️ Suivi de la Ligue de Guerre de Clan")
         
-        # Récupération directe depuis le cache global en session (zéro délai à l'affichage)
         league_data = st.session_state.get("cached_league_data", None)
         
         if not league_data or not league_data.get("wars"):
@@ -27,10 +26,13 @@ def render_tab_overview():
         wars = league_data.get("wars", [])
         CLAN_TAG = "#2U0GCGPJU"
         
-        member_attacks = {}
-        days_columns = [f"Jour {i+1}" for i in range(len(wars))]
+        # On filtre et ne garde que les 7 jours de guerre effectifs (on ignore les entrées vides ou de préparation)
+        valid_wars = [w for w in wars if w and w.get("state") != "notInWar"][:7]
         
-        for day_idx, war in enumerate(wars):
+        member_attacks = {}
+        days_columns = [f"Jour {i+1}" for i in range(len(valid_wars))]
+        
+        for day_idx, war in enumerate(valid_wars):
             for side in ["clan", "opponent"]:
                 clan_info = war.get(side, {})
                 if clan_info.get("tag") == CLAN_TAG:
