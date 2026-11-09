@@ -1,8 +1,8 @@
 import streamlit as st
-from utils import get_db_client, update_account_composition, fetch_clan_war_league
+import pandas as pd
+from utils import get_db_client, update_account_composition
 
 def render_tab_overview():
-    # Sélecteur de mode en haut de l'onglet
     overview_mode = st.radio(
         "Mode de la Vue d'ensemble",
         [
@@ -17,21 +17,18 @@ def render_tab_overview():
     if overview_mode == "⚔️ Ligue Overview":
         st.subheader("⚔️ Suivi de la Ligue de Guerre de Clan")
         
-        CLAN_TAG = "#2U0GCGPJU"
-        league_data, error = fetch_clan_war_league(CLAN_TAG)
+        # Récupération directe depuis le cache global en session (zéro délai à l'affichage)
+        league_data = st.session_state.get("cached_league_data", None)
         
-        if error or not league_data or not league_data.get("wars"):
-            st.info(f"⚠️ Impossible de charger les données de ligue pour le clan {CLAN_TAG} (Vérifie si une CWL est active ou si le token API est valide).")
+        if not league_data or not league_data.get("wars"):
+            st.info("⚠️ Aucune donnée de ligue disponible ou active pour ce clan.")
             return
             
         wars = league_data.get("wars", [])
+        CLAN_TAG = "#2U0GCGPJU"
         
-        # Identifier si notre clan est clan1 ou clan2 dans les données de guerre et collecter les participants
-        participants = {}
-        days_columns = [f"Jour {i+1}" for i in range(len(wars))]
-        
-        # Structurer les données par membre
         member_attacks = {}
+        days_columns = [f"Jour {i+1}" for i in range(len(wars))]
         
         for day_idx, war in enumerate(wars):
             for side in ["clan", "opponent"]:
@@ -40,7 +37,7 @@ def render_tab_overview():
                     for member in clan_info.get("members", []):
                         name = member.get("name")
                         if name not in member_attacks:
-                            member_attacks[name] = {d: "Pas de match" for d in days_columns}
+                            member_attacks[name] = {d: "⏳ Non jouée" for d in days_columns}
                         
                         attacks = member.get("attacks", [])
                         if attacks:
@@ -48,15 +45,11 @@ def render_tab_overview():
                             for atk in attacks:
                                 stars = atk.get("stars", 0)
                                 destruction = atk.get("destructionPercentage", 0)
-                                defender_tag = atk.get("defenderTag")
-                                atk_details.write = f"⭐️ {stars} ({destruction}%)" if stars > 0 else f"❌ 0 ({destruction}%)"
-                                atk_details.append(f"{stars}★ ({destruction}%)")
-                            member_attacks[name][days_columns[day_idx]] = " + ".join(atk_details)
-                        else:
-                            member_attacks[name][days_columns[day_idx]] = "⏳ En attente / Non jouée"
+                                icon = "⭐" if stars > 0 else "❌"
+                                atk_details.append(f"{icon} {stars}★ ({destruction}%)")
+                            member_attacks[name][days_columns[day_idx]] = " | ".join(atk_details)
 
         if member_attacks:
-            import pandas as pd
             df_data = []
             for member_name, rounds in member_attacks.items():
                 row = {"Membre": member_name}
@@ -69,17 +62,15 @@ def render_tab_overview():
             st.info("Aucun participant trouvé pour cette ligue.")
 
     else:
-        # Code d'origine de la vue d'ensemble des joueurs et compositions
+        # Vue d'ensemble classique des joueurs et compositions
         st.subheader("📊 Vue d'ensemble de tous les joueurs et Compositions")
         
         conn = get_db_client()
-        
         accounts_res = conn.execute("SELECT player_tag, name, town_hall, active_composition FROM accounts")
         accounts = accounts_res.rows
         
         comps_res = conn.execute("SELECT comp_name, details FROM compositions")
         all_comps = {row[0]: row[1] for row in comps_res.rows}
-        
         comp_options = list(all_comps.keys())
         
         if not accounts:
@@ -96,7 +87,6 @@ def render_tab_overview():
 
         for acc in accounts:
             tag, name, th, active_comp = acc[0], acc[1], acc[2], acc[3]
-            
             row_cols = st.columns([1, 0.5, 0.5, 6, 0.6])
             
             row_cols[0].markdown(f"**{name}**")
@@ -104,7 +94,6 @@ def render_tab_overview():
             row_cols[2].markdown("0 🏆")
             
             details_raw = all_comps.get(active_comp, "") if active_comp else ""
-            
             cleaned_details = details_raw
             for prefix in [
                 "Héros ->", "Pet:", "Équipements:", "Troupes:", "Sorts:", 
@@ -116,7 +105,6 @@ def render_tab_overview():
                 cleaned_details = cleaned_details.replace(prefix, "")
                 
             cleaned_details = cleaned_details.replace("()", "").replace("  ", " ").strip(" |-/")
-
             comp_display_text = f"**{active_comp}** — <span style='font-size: 0.9em; color: #ddd;'>{cleaned_details}</span>" if active_comp in all_comps else ":grey[Aucune composition assignée]"
             
             row_cols[3].markdown(comp_display_text, unsafe_allow_html=True)
@@ -134,17 +122,10 @@ def render_tab_overview():
                     else:
                         current_idx = comp_options.index(active_comp) if active_comp in comp_options else 0
                         with st.form(key=f"form_comp_{tag}"):
-                            new_comp = st.selectbox(
-                                "Compo", 
-                                comp_options, 
-                                index=current_idx, 
-                                key=f"sel_{tag}", 
-                                label_visibility="collapsed"
-                            )
+                            new_comp = st.selectbox("Compo", comp_options, index=current_idx, key=f"sel_{tag}", label_visibility="collapsed")
                             col_save, col_cancel = st.columns(2)
                             with col_save:
-                                submitted = st.form_submit_button("💾")
-                                if submitted:
+                                if st.form_submit_button("💾"):
                                     update_account_composition(tag, new_comp)
                                     st.session_state[edit_state_key] = False
                                     st.rerun()
@@ -154,5 +135,4 @@ def render_tab_overview():
                                     st.rerun()
                 else:
                     st.caption("⚠️")
-            
             st.markdown("---")
