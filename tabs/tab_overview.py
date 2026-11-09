@@ -37,6 +37,6 @@ def render_tab_overview():
     if overview_mode == "⚔️ Ligue Overview":
         render_mode_league(accounts_dict, ordered_tags)
     elif overview_mode == "🏆 Ligues Classées":
-        render_mode_ranked(db_accounts, accounts_dict, ordered_tags)
+        render_mode_ranked()
     else:
         render_mode_general(db_accounts, accounts_dict, ordered_tags)
