@@ -2,7 +2,7 @@ import streamlit as st
 from utils import init_db, get_all_accounts, fetch_player_data, get_db_favorites
 from tabs.tab_config import render_tab_config
 from tabs.tab_overview import render_tab_overview
-from tabs.tab_heroes import render_tab_heroes
+from tabs.tab_army import render_tab_army
 from tabs.tab_troops import render_tab_troops
 
 st.set_page_config(page_title="CoC Multi-Account Dashboard", page_icon="🛡️", layout="wide")
@@ -64,7 +64,7 @@ with tab1:
     render_tab_overview(data, current_tag)
 
 with tab2:
-    render_tab_heroes(data, current_favorites)
+    render_tab_army(data, current_favorites)
 
 with tab3:
     render_tab_troops(data, current_favorites)
