@@ -1,5 +1,5 @@
 import streamlit as st
-from utils import get_db_client, update_account_composition, fetch_player_data, get_db_favorites, get_icon_emoji
+from utils import get_db_client, update_account_composition
 
 def render_tab_overview():
     st.subheader("📊 Vue d'ensemble de tous les joueurs et Compositions")
@@ -18,7 +18,6 @@ def render_tab_overview():
         st.info("Aucun compte enregistré.")
         return
 
-    # Colonnes ultra-compactes pour pseudo, HDV, ligue, action, et toute la largeur pour la compo
     header_cols = st.columns([1, 0.5, 0.5, 6, 0.6])
     header_cols[0].markdown("**Pseudo**")
     header_cols[1].markdown("**HDV**")
@@ -36,12 +35,22 @@ def render_tab_overview():
         row_cols[1].markdown(f"TH {th}")
         row_cols[2].markdown("0 🏆")
         
-        # Nettoyage et épuration du texte des détails pour ne garder que l'essence visuelle
         details_raw = all_comps.get(active_comp, "") if active_comp else ""
         
-        # Si on veut alléger le texte brut enregistré en retirant les mots superflus
-        cleaned_details = details_raw.replace("Héros ->", "").replace("Pet:", "").replace("Équipements:", "").replace("Troupes:", "").replace("Sorts:", "")
-        
+        # Nettoyage ultra-poussé pour supprimer les noms des héros, des familiers, les libellés et le mot "Spell"
+        cleaned_details = details_raw
+        for prefix in [
+            "Héros ->", "Pet:", "Équipements:", "Troupes:", "Sorts:", 
+            "Barbarian King", "Archer Queen", "Grand Warden", "Royal Champion", "Minion Prince",
+            "L.A.S.S.I", "Mighty Yak", "Electro Owl", "Unicorn", "Phoenix", 
+            "Poison Lizard", "Diggy", "Frosty", "Spirit Fox", "Angry Jelly", "Sneezy", "Greedy Raven",
+            " Spell"
+        ]:
+            cleaned_details = cleaned_details.replace(prefix, "")
+            
+        # Nettoyer les espaces superflus ou tirets restants
+        cleaned_details = cleaned_details.replace("()", "").replace("  ", " ").strip(" |-/")
+
         comp_display_text = f"**{active_comp}** — <span style='font-size: 0.9em; color: #ddd;'>{cleaned_details}</span>" if active_comp in all_comps else ":grey[Aucune composition assignée]"
         
         row_cols[3].markdown(comp_display_text, unsafe_allow_html=True)
