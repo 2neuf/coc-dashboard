@@ -17,7 +17,6 @@ SIEGE_MACHINES_LIST = [
 def get_db_client():
     url = os.environ.get("TURSO_DATABASE_URL", "https://coc-dashboard-2neuf.aws-eu-west-1.turso.io")
     auth_token = os.environ.get("TURSO_AUTH_TOKEN", "")
-    # Forcer l'URL HTTP pour libSQL client si nécessaire, ou utiliser libsql_client en mode HTTP
     if url.startswith("libsql://"):
         url = url.replace("libsql://", "https://")
     return libsql_client.create_client_sync(url=url, auth_token=auth_token, tls=True)
@@ -43,14 +42,19 @@ def init_db():
                 item_name TEXT PRIMARY KEY
             )
         """)
+        
+        # Table compositions avec raw_data inclus directement
         conn.execute("""
             CREATE TABLE IF NOT EXISTS compositions (
                 comp_name TEXT PRIMARY KEY,
-                details TEXT
+                details TEXT,
+                town_hall_level INTEGER DEFAULT 18,
+                raw_data TEXT
             )
         """)
+        # Sécurité au cas où la table existait sans raw_data
         try:
-            conn.execute("ALTER TABLE compositions ADD COLUMN town_hall_level INTEGER DEFAULT 18")
+            conn.execute("ALTER TABLE compositions ADD COLUMN raw_data TEXT")
         except Exception:
             pass
 
@@ -72,7 +76,6 @@ def init_db():
 def get_all_accounts():
     conn = get_db_client()
     res = conn.execute("SELECT player_tag, name, town_hall, active_composition FROM accounts")
-    # On renvoie directement les tuples (player_tag, name, town_hall, active_composition)
     return [row for row in res.rows]
 
 def fetch_player_data(player_tag):
@@ -111,8 +114,7 @@ def get_icon_emoji(name):
         "Barbarian King": "👑", "Archer Queen": "🏹", "Grand Warden": "🧙‍♂️", "Royal Champion": "🛡️", "Minion Prince": "🦇",
         "L.A.S.S.I": "🐶", "Mighty Yak": "🐂", "Electro Owl": "🦉", "Unicorn": "🦄", 
         "Phoenix": "🔥", "Poison Lizard": "🦎", "Diggy": "🦫", "Frosty": "❄️", 
-        "Spirit Fox": "🦊", "Angry Jelly": "🪼", "Sneezy": "🤧", "Greedy Raven": "🦅",
-        # Ajout d'autres équipements/éléments si besoin
+        "Spirit Fox": "🦊", "Angry Jelly": "🪼", "Sneezy": "🤧", "Greedy Raven": "🦅"
     }
     return icons.get(name, "⚔️")
 
