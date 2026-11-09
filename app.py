@@ -1,5 +1,13 @@
 import streamlit as st
-from utils import init_db, get_all_accounts, fetch_player_data, get_db_favorites, get_db_client, fetch_clan_war_league, sync_league_players_to_db
+from utils import (
+    init_db, 
+    get_all_accounts, 
+    fetch_player_data, 
+    get_db_favorites, 
+    get_db_client, 
+    fetch_clan_war_league, 
+    update_all_accounts_from_api
+)
 from tabs.tab_config import render_tab_config
 from tabs.tab_overview import render_tab_overview
 from tabs.tab_army import render_tab_army
@@ -50,9 +58,8 @@ if not st.session_state["app_fully_loaded"]:
         league_data, league_error = fetch_clan_war_league(CLAN_TAG)
         st.session_state["cached_league_data"] = league_data
 
-        # Synchronisation automatique des membres de ligue dans la table accounts (une seule fois)
-        if league_data:
-            sync_league_players_to_db(league_data)
+        # Mise à jour des informations (HDV réels, pseudos) de tous les comptes enregistrés via l'API joueur
+        update_all_accounts_from_api()
 
         # Préchargement global des emojis et compositions en mémoire
         conn_db = get_db_client()
