@@ -61,7 +61,7 @@ tab1, tab2, tab3, tab4 = st.tabs([
 ])
 
 with tab1:
-    render_tab_overview(data)
+    render_tab_overview()
 
 with tab2:
     render_tab_army(data, current_favorites)
