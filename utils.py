@@ -291,3 +291,28 @@ def get_all_archived_months():
         return [row[0] for row in res.rows]
     except Exception:
         return []
+
+def init_ranked_leagues_table():
+    """Initialise la table pour stocker le suivi des ligues classées hebdomadaires."""
+    conn = get_db_client()
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS ranked_leagues (
+                player_tag TEXT,
+                week_key TEXT,
+                status TEXT DEFAULT 'Prévu',
+                attacks_done INTEGER DEFAULT 0,
+                attacks_max INTEGER DEFAULT 8,
+                stars_3 INTEGER DEFAULT 0,
+                stars_2 INTEGER DEFAULT 0,
+                stars_1 INTEGER DEFAULT 0,
+                avg_destruction REAL DEFAULT 0.0,
+def_done INTEGER DEFAULT 0,
+                def_max INTEGER DEFAULT 8,
+                trophies_attack INTEGER DEFAULT 0,
+                trophies_defense INTEGER DEFAULT 0,
+                PRIMARY KEY (player_tag, week_key)
+            )
+        """)
+    except Exception:
+        pass
