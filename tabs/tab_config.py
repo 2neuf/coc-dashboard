@@ -3,7 +3,6 @@ from utils import get_db_client, get_icon_emoji, sort_items, HERO_PETS_LIST, SIE
 import json
 
 def render_tab_config(data, current_tag, player_name, current_favorites):
-    # Sélecteur de mode en haut de la page (Compositions par défaut)
     config_mode = st.radio(
         "Mode de configuration",
         ["⚙️ Paramétrage des Compositions", "🔗 Association des Équipements par Héros"],
@@ -15,7 +14,6 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
     available_heroes = [h.get('name') for h in data.get("heroes", []) if h.get("village") == "home"]
     all_player_eqs = [e.get('name') for e in data.get("heroEquipment", [])]
 
-    # --- MODE 1 : ASSOCIATION DES ÉQUIPEMENTS PAR HÉROS ---
     if config_mode == "🔗 Association des Équipements par Héros":
         st.subheader("🛠️ Gestion dynamique : Associer les Équipements aux Héros")
         st.markdown("Utilisez cet espace pour lier manuellement vos équipements à chaque héros de votre choix.")
@@ -73,7 +71,6 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
         else:
             st.info("Aucun héros ou équipement détecté par l'API pour ce joueur.")
 
-    # --- MODE 2 : PARAMÉTRAGE DES COMPOSITIONS (PAR DÉFAUT) ---
     else:
         st.subheader("⚙️ Paramétrage & Modification des Compositions d'Attaque")
         
@@ -226,7 +223,7 @@ def render_tab_config(data, current_tag, player_name, current_favorites):
         selected_troop_labels = st.multiselect("Sélectionner les Troupes", troop_labels, default=default_troop_labels, key="troops_multiselect")
         selected_troops_comp = [troop_map[l] for l in selected_troop_labels if l in troop_map]
         
-        spells_raw_objs = [s for s in data.get("spells", []) if s.get("village"] == "home"]
+        spells_raw_objs = [s for s in data.get("spells", []) if s.get("village") == "home"]
         sorted_spells_objs = sort_items(spells_raw_objs, current_favorites)
         available_spells = [s.get('name') for s in sorted_spells_objs]
         
