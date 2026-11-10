@@ -71,6 +71,30 @@ def ensure_table(conn):
         )
     """)
 
+    # Table déjà existante : on ajoute les colonnes manquantes
+    col_types = {
+        "status": "TEXT", "league_level": "TEXT", "attacks_done": "INTEGER", "attacks_max": "INTEGER",
+        "stars_3": "INTEGER", "stars_2": "INTEGER", "stars_1": "INTEGER",
+        "stars_0_details": "TEXT", "stars_1_details": "TEXT", "stars_2_details": "TEXT",
+        "avg_destruction": "REAL", "def_done": "INTEGER", "def_max": "INTEGER",
+        "def_0_details": "TEXT", "def_1_details": "TEXT", "def_2_details": "TEXT",
+        "def_missing": "INTEGER", "trophies_attack": "REAL", "trophies_defense": "REAL",
+    }
+    res = conn.execute("SELECT name FROM pragma_table_info('ranked_leagues')")
+    present = {row[0] for row in res.rows}
+    for col, col_type in col_types.items():
+        if col not in present:
+            conn.execute(f"ALTER TABLE ranked_leagues ADD COLUMN {col} {col_type}")
+
+    # Nécessaire pour le ON CONFLICT(player_tag, week_key) de l'enregistrement
+    try:
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_ranked_tag_week "
+            "ON ranked_leagues(player_tag, week_key)"
+        )
+    except Exception:
+        pass
+
 
 def _rows_to_dicts(res):
     rows = res.rows if hasattr(res, "rows") else []
