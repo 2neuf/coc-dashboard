@@ -360,19 +360,18 @@ def render_form(conn, accounts):
     ]
     declared_def = sum(n_def)
 
-    ce, cr = st.columns(2)
-    expected = ce.number_input(
-        "Défenses théoriques attendues", min_value=0,
-        value=int(existing["def_max"]) if existing and existing["def_max"] else quota,
-        step=1, key=f"rk_dexp_{k}",
-    )
+    # Défenses attendues = quota d'attaques de la ligue
+    expected = quota
     prev_recv = int(existing["def_done"]) if existing and existing["def_done"] else 0
-    received = cr.number_input(
-        "Défenses réellement reçues", min_value=declared_def,
-        value=max(declared_def, prev_recv), step=1, key=f"rk_drecv_{k}_{declared_def}",
+    received = st.number_input(
+        f"Défenses réellement reçues (sur {expected} attendues)",
+        min_value=declared_def, max_value=max(expected, declared_def),
+        value=min(max(declared_def, prev_recv), max(expected, declared_def)),
+        step=1, key=f"rk_drecv_{k}_{quota}_{declared_def}",
     )
-    if expected < received:
-        st.warning("Le nombre de défenses reçues dépasse le nombre attendu : aucune défense manquante ne sera ajoutée.")
+    missing_preview = max(0, expected - received)
+    if missing_preview:
+        st.info(f"💡 {missing_preview} défense(s) manquante(s) : la moyenne de trophées par défense sera ajoutée pour chacune.")
 
     # --- Détails (dans le formulaire) -------------------------------------
     with st.form(key=f"rk_form_{k}_{quota}"):
@@ -457,4 +456,3 @@ def render_form(conn, accounts):
         m[1].metric("Étoiles", f"{stars_total} / {3 * (existing['attacks_max'] or 0)}")
         m[2].metric("Destruction moy.", f"{(existing['avg_destruction'] or 0):.1f}%")
         m[3].metric("Trophées déf. ajustés", f"{(existing['trophies_defense'] or 0):+.1f}")
-
