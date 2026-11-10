@@ -146,44 +146,31 @@ def calculate_defense_trophies(stars, destruction_pct):
 
 
 def compute_summary(atk_pcts_by_star, nb_3_star, def_details_list, received, expected):
-    """
-    atk_pcts_by_star : tuple/liste de 3 listes [pcts_0_star, pcts_1_star, pcts_2_star]
-    def_details_list : tuple/liste de 3 listes de dicts [{"pct": ...}, ...] pour les defs 0, 1, 2 étoiles
-    """
-    # 1. Calcul des attaques
     flat_atk_pcts = []
     total_atk_trophies = 0
 
-    # 0 étoile
     for p in atk_pcts_by_star[0]:
         flat_atk_pcts.append(float(p))
         total_atk_trophies += calculate_attack_trophies(0, p)
-    # 1 étoile
     for p in atk_pcts_by_star[1]:
         flat_atk_pcts.append(float(p))
         total_atk_trophies += calculate_attack_trophies(1, p)
-    # 2 étoiles
     for p in atk_pcts_by_star[2]:
         flat_atk_pcts.append(float(p))
         total_atk_trophies += calculate_attack_trophies(2, p)
-    # 3 étoiles (100% et 40 trophées chacunes)
     for _ in range(nb_3_star):
         flat_atk_pcts.append(100.0)
         total_atk_trophies += 40
 
     avg_destruction = sum(flat_atk_pcts) / len(flat_atk_pcts) if flat_atk_pcts else 0.0
 
-    # 2. Calcul des défenses
     def_trophies_collected = []
-    # defs 0 étoile subies (donc l'adversaire a fait 0⭐, on gagne 40 trophées)
     for d in def_details_list[0]:
         p = d.get("pct", 0)
         def_trophies_collected.append(calculate_defense_trophies(0, p))
-    # defs 1 étoile subies
     for d in def_details_list[1]:
         p = d.get("pct", 0)
         def_trophies_collected.append(calculate_defense_trophies(1, p))
-    # defs 2 étoiles subies
     for d in def_details_list[2]:
         p = d.get("pct", 0)
         def_trophies_collected.append(calculate_defense_trophies(2, p))
@@ -372,13 +359,12 @@ def render_form(conn, accounts):
 
     ex_atk = [_loads(existing.get(f"stars_{i}_details"), []) if existing else [] for i in range(3)]
     
-    # Récupération sécurisée des pourcentages de défense enregistrés
     ex_def_pcts = []
     for i in range(3):
         d_data = _loads(existing.get(f"def_{i}_details"), {}) if existing else {}
         if isinstance(d_data, dict):
             ex_def_pcts.append(d_data.get("pct", []))
-        elif isinstance(d_data, list): # compatibilité ancienne structure
+        elif isinstance(d_data, list):
             ex_def_pcts.append(d_data)
         else:
             ex_def_pcts.append([])
@@ -444,13 +430,11 @@ def render_form(conn, accounts):
             st.error("Impossible d'enregistrer : le nombre d'attaques dépasse le quota.")
             return
 
-        # Construction des listes de détails de défense avec leurs trophées calculés automatiquement
         def_details_structured = [
             [{"pct": p, "trophies": calculate_defense_trophies(0, p)} for p in d0_pcts],
             [{"pct": p, "trophies": calculate_defense_trophies(1, p)} for p in d1_pcts],
             [{"pct": p, "trophies": calculate_defense_trophies(2, p)} for p in d2_pcts],
         ]
-        flat_def_trophies = [item["trophies"] for sublist in def_details_structured for item in sublist]
 
         summary = compute_summary(
             atk_pcts_by_star=atk_pcts,
