@@ -500,3 +500,34 @@ def render_form(conn, accounts):
         m[2].metric("Trophées atk", f"{int(existing['trophies_attack'] or 0):+d}")
         m[3].metric("Destruction moy.", f"{(existing['avg_destruction'] or 0):.1f}%")
         m[4].metric("Trophées déf. ajustés", f"{(existing['trophies_defense'] or 0):+.1f}")
+
+        # 🔍 SECTION DE DÉBOGAGE : Affichage détaillé des trophées par match
+        with st.expander("🔍 Voir le détail des trophées (Debug Attaques & Défenses)"):
+            st.write("**Détail des attaques :**")
+            for star_lvl in [0, 1, 2]:
+                details_json = existing.get(f"stars_{star_lvl}_details")
+                pcts = _loads(details_json, [])
+                if pcts:
+                    for idx, p in enumerate(pcts):
+                        # On applique la même fonction de calcul pour afficher le résultat individuel
+                        from overview_modes.mode_ranked import calculate_attack_trophies # ou appel direct si dans le même fichier
+                        t_calc = calculate_attack_trophies(star_lvl, p)
+                        st.text(f"• Attaque {star_lvl}⭐ #{idx+1} : {p}% de destruction -> {t_calc} trophées")
+            
+            if existing.get("stars_3", 0) > 0:
+                st.text(f"• Attaques 3⭐ : {existing['stars_3']} attaque(s) à 100% -> 40 trophées chacune")
+
+            st.write("---")
+            st.write("**Détail des défenses subies :**")
+            for star_lvl in [0, 1, 2]:
+                def_data = _loads(existing.get(f"def_{star_lvl}_details"), {})
+                pcts = def_data.get("pct", []) if isinstance(def_data, dict) else []
+                trophies_list = def_data.get("trophies", []) if isinstance(def_data, dict) else []
+                if pcts:
+                    for idx, p in enumerate(pcts):
+                        t_val = trophies_list[idx] if idx < len(trophies_list) else "N/A"
+                        st.text(f"• Défense {star_lvl}⭐ subie #{idx+1} : {p}% de destruction -> {t_val} trophées de défense")
+            
+            missing_def = existing.get("def_missing", 0)
+            if missing_def > 0:
+                st.text(f"• Défenses manquantes prises en compte : {missing_def} (compensées par la moyenne)")
