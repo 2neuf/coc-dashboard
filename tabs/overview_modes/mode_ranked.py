@@ -132,16 +132,21 @@ def calculate_attack_trophies(stars, destruction_pct):
     if stars == 3:
         return 40
     elif stars == 2:
+        # 16 trophées minimum + 1 trophée tous les 3% au-dessus de 50%
         extra = max(0, destruction_pct - 50)
         return 16 + int(extra // 3)
     elif stars == 1:
-        return 6 + int(destruction_pct // 10)
+        # 4 trophées de base + 1 trophée par tranche de 8% de destruction
+        # Exemple : 70% -> 4 + (70 // 8) = 4 + 8 = 12 trophées
+        return 4 + int(destruction_pct // 8)
     elif stars == 0:
+        # 1 trophée tous les 10%
         return int(destruction_pct // 10)
     return 0
 
 
 def calculate_defense_trophies(stars, destruction_pct):
+    # L'adversaire gagne des trophées selon son attaque, on récupère le reste pour arriver à 40
     return 40 - calculate_attack_trophies(stars, destruction_pct)
 
 
@@ -176,7 +181,13 @@ def compute_summary(atk_pcts_by_star, nb_3_star, def_details_list, received, exp
         def_trophies_collected.append(calculate_defense_trophies(2, p))
 
     sum_received = sum(def_trophies_collected)
-    avg_per_def = sum_received / received if received > 0 else 0.0
+    
+    # Calcul de la moyenne des défenses reçues (arrondie à l'entier inférieur)
+    if received > 0:
+        avg_per_def = int(sum_received // received)
+    else:
+        avg_per_def = 0
+
     missing = max(0, expected - received)
     adjusted_defense_trophies = sum_received + missing * avg_per_def
 
@@ -184,7 +195,7 @@ def compute_summary(atk_pcts_by_star, nb_3_star, def_details_list, received, exp
         "avg_destruction": round(avg_destruction, 2),
         "missing": missing,
         "trophies_attack": total_atk_trophies,
-        "trophies_defense": round(adjusted_defense_trophies, 1),
+        "trophies_defense": float(adjusted_defense_trophies),
     }
 
 
