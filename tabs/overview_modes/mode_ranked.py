@@ -1,6 +1,5 @@
 import json
 import os
-
 import pandas as pd
 import streamlit as st
 
@@ -132,21 +131,16 @@ def calculate_attack_trophies(stars, destruction_pct):
     if stars == 3:
         return 40
     elif stars == 2:
-        # 16 trophées minimum + 1 trophée tous les 3% au-dessus de 50%
         extra = max(0, destruction_pct - 50)
         return 16 + int(extra // 3)
     elif stars == 1:
-        # 4 trophées de base + 1 trophée par tranche de 8% de destruction
-        # Exemple : 70% -> 4 + (70 // 8) = 4 + 8 = 12 trophées
         return 4 + int(destruction_pct // 8)
     elif stars == 0:
-        # 1 trophée tous les 10%
         return int(destruction_pct // 10)
     return 0
 
 
 def calculate_defense_trophies(stars, destruction_pct):
-    # L'adversaire gagne des trophées selon son attaque, on récupère le reste pour arriver à 40
     return 40 - calculate_attack_trophies(stars, destruction_pct)
 
 
@@ -181,8 +175,6 @@ def compute_summary(atk_pcts_by_star, nb_3_star, def_details_list, received, exp
         def_trophies_collected.append(calculate_defense_trophies(2, p))
 
     sum_received = sum(def_trophies_collected)
-    
-    # Calcul de la moyenne des défenses reçues (arrondie à l'entier inférieur)
     if received > 0:
         avg_per_def = int(sum_received // received)
     else:
@@ -219,10 +211,6 @@ def render_mode_ranked():
             st.warning("⚠️ Aucun compte en base. Ajoute d'abord un compte dans l'application.")
             return
 
-        # Gestion du basculement d'onglet automatique via la session
-        if "ranked_active_tab" not in st.session_state:
-            st.session_state["ranked_active_tab"] = 0
-
         tab_overview, tab_form = st.tabs(["📊 Vue d'ensemble", "📝 Saisir / Modifier une ligue"])
         with tab_overview:
             render_overview(conn, accounts)
@@ -236,7 +224,7 @@ def render_mode_ranked():
 
 
 # ---------------------------------------------------------------------------
-# Vue d'ensemble
+# Vue d'ensemble (Tableau Unique par Compte)
 # ---------------------------------------------------------------------------
 def render_overview(conn, accounts):
     try:
@@ -244,78 +232,74 @@ def render_overview(conn, accounts):
     except Exception as e:
         st.error(f"Erreur de lecture des ligues : {e}")
         return
-    if not rows:
-        st.info("Aucune ligue enregistrée pour le moment. Utilise l'onglet « Saisir une ligue terminée ».")
-        return
-
-    names = {tag: name for tag, name in accounts}
-    df = pd.DataFrame(rows)
-    for col in NUM_COLS:
-        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
-    df["Compte"] = df["player_tag"].map(names).fillna(df["player_tag"])
-    df["_order"] = df["week_key"].map(_week_order)
-    df["stars_0"] = df["stars_0_details"].map(lambda v: len(_loads(v, [])))
-    df["stars_total"] = 3 * df["stars_3"] + 2 * df["stars_2"] + df["stars_1"]
-    df = df.sort_values("_order")
-
-    st.markdown("### Dernière période de chaque compte")
-    for tag, g in df.groupby("player_tag", sort=False):
-        last = g.iloc[-1]
-        prev = g.iloc[-2] if len(g) > 1 else None
-        with st.container(border=True):
-            st.markdown(f"**{last['Compte']}** · {last['week_key']} · {last['status']}")
-            c = st.columns(6)
-            c[0].metric("Ligue", last["league_level"])
-            c[1].metric("Attaques", f"{int(last['attacks_done'])} / {int(last['attacks_max'])}")
-            c[2].metric("Étoiles", f"{int(last['stars_total'])} / {3 * int(last['attacks_max'])}")
-            c[3].metric("Trophées atk", f"{int(last['trophies_attack']):+d}")
-            c[4].metric(
-                "Destr. moy.", f"{last['avg_destruction']:.1f}%",
-                delta=None if prev is None else f"{last['avg_destruction'] - prev['avg_destruction']:+.1f} pt",
-            )
-            c[5].metric(
-                "Trophées déf.", f"{last['trophies_defense']:+.1f}",
-                delta=None if prev is None else f"{last['trophies_defense'] - prev['trophies_defense']:+.1f}",
-            )
-
-    st.markdown("### Historique d'un compte")
-    account_names = list(dict.fromkeys(df["Compte"]))
-    chosen = st.selectbox("Compte", account_names, key="rk_overview_account")
-    hist = df[df["Compte"] == chosen]
-
-    chart_df = hist.set_index("week_key")
-    col_a, col_b = st.columns(2)
-    with col_a:
-        st.caption("Destruction moyenne (%)")
-        st.line_chart(chart_df[["avg_destruction"]])
-    with col_b:
-        st.caption("Trophées (Attaque & Défense)")
-        st.line_chart(chart_df[["trophies_attack", "trophies_defense"]])
-
-    table = hist[[
-        "week_key", "league_level", "attacks_done", "stars_3", "stars_2", "stars_1", "stars_0",
-        "stars_total", "avg_destruction", "trophies_attack", "def_done", "def_max", "def_missing", "trophies_defense",
-    ]].rename(columns={
-        "week_key": "Période", "league_level": "Ligue", "attacks_done": "Attaques",
-        "stars_3": "3⭐", "stars_2": "2⭐", "stars_1": "1⭐", "stars_0": "0⭐",
-        "stars_total": "Étoiles", "avg_destruction": "Destr. moy. (%)", "trophies_attack": "Trophées atk",
-        "def_done": "Déf. reçues", "def_max": "Déf. attendues", "def_missing": "Déf. manquantes",
-        "trophies_defense": "Trophées déf.",
-    })
-    st.dataframe(table, hide_index=True)
-
-    # ✏️ Raccourci pour modifier une semaine directement
-    st.markdown("#### ✏️ Modifier une semaine enregistrée")
-    selected_row_to_edit = st.selectbox(
-        "Choisir la semaine à modifier", 
-        hist["week_key"].tolist(), 
-        key="select_edit_week"
-    )
-    if st.button("📝 Charger et modifier cette semaine"):
-        tag_to_edit = hist[hist["week_key"] == selected_row_to_edit]["player_tag"].values[0]
-        st.session_state["edit_tag"] = tag_to_edit
-        st.session_state["edit_week_key"] = selected_row_to_edit
-        st.success(f"Période **{selected_row_to_edit}** sélectionnée ! Rendez-vous dans l'onglet 'Saisir / Modifier une ligue'.")
+    
+    df = pd.DataFrame(rows) if rows else pd.DataFrame(columns=COLUMNS)
+    table_data = []
+    
+    for tag, name in accounts:
+        acc_rows = df[df["player_tag"] == tag] if not df.empty else pd.DataFrame()
+        if not acc_rows.empty:
+            acc_rows["_order"] = acc_rows["week_key"].map(_week_order)
+            acc_rows = acc_rows.sort_values("_order")
+            last = acc_rows.iloc[-1]
+            
+            league = last.get("league_level", "-")
+            status = last.get("status", "Terminé")
+            week_info = last.get("week_key", "")
+            statut_display = f"{status} ({week_info})"
+            
+            attacks_done = int(last.get("attacks_done", 0) or 0)
+            attacks_max = int(last.get("attacks_max", 0) or 0)
+            s3 = int(last.get("stars_3", 0) or 0)
+            s2 = int(last.get("stars_2", 0) or 0)
+            s1 = int(last.get("stars_1", 0) or 0)
+            s0 = len(_loads(last.get("stars_0_details"), []))
+            
+            avg_dest = float(last.get("avg_destruction", 0.0) or 0.0)
+            t_atk = float(last.get("trophies_attack", 0.0) or 0.0)
+            
+            def_done = int(last.get("def_done", 0) or 0)
+            def_max = int(last.get("def_max", 0) or 0)
+            t_def = float(last.get("trophies_defense", 0.0) or 0.0)
+            
+            avg_def_trophy = int(t_def // def_done) if def_done > 0 else 0
+            total_trophies = t_atk + t_def
+            
+            table_data.append({
+                "Pseudo": name,
+                "Ligue": league,
+                "Statut": statut_display,
+                "Atk (Faites / Max)": f"{attacks_done} / {attacks_max}",
+                "3⭐": s3,
+                "2⭐": s2,
+                "1⭐": s1,
+                "0⭐": s0,
+                "Destr. moy.": f"{avg_dest:.1f}%",
+                "Trophées Atk": f"{t_atk:+.0f}" if t_atk != 0 else "0",
+                "Déf (Reçues / Attendues)": f"{def_done} / {def_max}",
+                "Moy. trophée/déf.": f"{avg_def_trophy}",
+                "Trophées Déf": f"{t_def:+.0f}",
+                "Total Trophées": f"{total_trophies:+.0f}"
+            })
+        else:
+            table_data.append({
+                "Pseudo": name,
+                "Ligue": "-",
+                "Statut": "Inscris (Aucune ligue)",
+                "Atk (Faites / Max)": "0 / 0",
+                "3⭐": 0, "2⭐": 0, "1⭐": 0, "0⭐": 0,
+                "Destr. moy.": "0.0%",
+                "Trophées Atk": "0",
+                "Déf (Reçues / Attendues)": "0 / 0",
+                "Moy. trophée/déf.": "0",
+                "Trophées Déf": "0",
+                "Total Trophées": "0"
+            })
+            
+    summary_df = pd.DataFrame(table_data)
+    
+    st.markdown("### 📊 Tableau de Suivi Global des Ligues")
+    st.dataframe(summary_df, use_container_width=True, hide_index=True)
 
 
 # ---------------------------------------------------------------------------
@@ -360,7 +344,6 @@ def render_form(conn, accounts):
 
     labels = {f"{name} ({tag})": tag for tag, name in accounts}
     
-    # Prise en compte du raccourci d'édition s'il a été utilisé depuis la vue d'ensemble
     default_acc_idx = 0
     if "edit_tag" in st.session_state:
         for idx, (lbl, t) in enumerate(labels.items()):
@@ -537,11 +520,10 @@ def render_form(conn, accounts):
             st.error(f"Erreur lors de l'enregistrement : {e}")
             return
 
-        # Nettoyage des clés temporaires de session d'édition
         st.session_state.pop("edit_tag", None)
         st.session_state.pop("edit_week_key", None)
 
-        st.session_state["ranked_flash"] = f"🎉 Résultats mis à jour avec succès pour {label} ({week_key}) !"
+        st.session_state["ranked_flash"] = f"🎉 Résultats enregistrés avec succès pour {label} ({week_key}) !"
         st.rerun()
 
     # --- Bilan de la période ---
@@ -556,7 +538,7 @@ def render_form(conn, accounts):
         m[3].metric("Destruction moy.", f"{(existing['avg_destruction'] or 0):.1f}%")
         m[4].metric("Trophées déf. ajustés", f"{(existing['trophies_defense'] or 0):+.1f}")
 
-        # 🔍 SECTION DE DÉBOGAGE : Affichage détaillé des trophées par match
+        # 🔍 SECTION DE DÉBOGAGE
         with st.expander("🔍 Voir le détail des trophées (Debug Attaques & Défenses)"):
             st.write("**Détail des attaques :**")
             for star_lvl in [0, 1, 2]:
