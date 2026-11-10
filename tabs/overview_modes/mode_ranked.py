@@ -266,7 +266,7 @@ def _pct_inputs(title, n, prefill, default, max_value, key):
         with cols[i % len(cols)]:
             values.append(st.number_input(
                 f"#{i + 1} (%)", min_value=0, max_value=max_value,
-                value=min(float(start), max_value), step=1, key=f"{key}_{i}",
+                value=min(start, max_value), step=1, key=f"{key}_{i}",
             ))
     return values
 
@@ -283,7 +283,7 @@ def _def_inputs(title, n, prefill, default_pct, default_trophy, max_pct, key):
         with c1:
             pcts.append(st.number_input(
                 f"Défense #{i + 1} (%)", min_value=0, max_value=max_pct,
-                value=min(float(pre_p[i]) if i < len(pre_p) else default_pct, max_pct),
+                value=min(pre_p[i] if i < len(pre_p) else default_pct, max_pct),
                 step=1, key=f"{key}_p_{i}",
             ))
         with c2:
