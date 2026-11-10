@@ -1,16 +1,39 @@
+import json
+import os
+
+import pandas as pd
 import streamlit as st
 
-# Quotas d'attaques fixés en dur selon le niveau de ligue
+# ---------------------------------------------------------------------------
+# Constantes
+# ---------------------------------------------------------------------------
 LEAGUE_ATTACK_QUOTAS = {
     "16": 10, "17": 10, "18": 10,
     "19": 14, "20": 14, "21": 14, "22": 14, "23": 14, "24": 14, "25": 14, "26": 14, "27": 14,
     "28": 14, "29": 14, "30": 14,
     "31": 18, "32": 18, "33": 18,
-    "Légende 3": 24, "Légende 2": 30, "Légende 1": 56
+    "Légende 3": 24, "Légende 2": 30, "Légende 1": 56,
 }
+LEAGUE_LEVELS = [str(i) for i in range(16, 34)] + ["Légende 3", "Légende 2", "Légende 1"]
+MONTHS = ["Novembre", "Décembre", "Janvier", "Février", "Mars", "Avril",
+          "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre"]
+WEEKS = [f"Semaine {i}" for i in range(1, 6)]
 
+COLUMNS = [
+    "player_tag", "week_key", "status", "league_level", "attacks_done", "attacks_max",
+    "stars_3", "stars_2", "stars_1", "stars_0_details", "stars_1_details", "stars_2_details",
+    "avg_destruction", "def_done", "def_max", "def_0_details", "def_1_details", "def_2_details",
+    "def_missing", "trophies_attack", "trophies_defense",
+]
+NUM_COLS = ["attacks_done", "attacks_max", "stars_3", "stars_2", "stars_1", "avg_destruction",
+            "def_done", "def_max", "def_missing", "trophies_attack", "trophies_defense"]
+
+
+# ---------------------------------------------------------------------------
+# Base de données (Turso)
+# ---------------------------------------------------------------------------
 def get_db_client():
-    import os
+    # TODO : si utils.py contient déjà une fonction de connexion, importe-la ici à la place.
     import libsql_client
     url = os.environ.get("TURSO_DATABASE_URL", "https://coc-dashboard-2neuf.aws-eu-west-1.turso.io")
     auth_token = os.environ.get("TURSO_AUTH_TOKEN", "")
@@ -18,241 +41,396 @@ def get_db_client():
         url = url.replace("libsql://", "https://")
     return libsql_client.create_client_sync(url=url, auth_token=auth_token, tls=True)
 
+
+def ensure_table(conn):
+    """Crée la table si elle n'existe pas (sans effet si elle existe déjà)."""
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS ranked_leagues (
+            player_tag TEXT NOT NULL,
+            week_key TEXT NOT NULL,
+            status TEXT,
+            league_level TEXT,
+            attacks_done INTEGER,
+            attacks_max INTEGER,
+            stars_3 INTEGER,
+            stars_2 INTEGER,
+            stars_1 INTEGER,
+            stars_0_details TEXT,
+            stars_1_details TEXT,
+            stars_2_details TEXT,
+            avg_destruction REAL,
+            def_done INTEGER,
+            def_max INTEGER,
+            def_0_details TEXT,
+            def_1_details TEXT,
+            def_2_details TEXT,
+            def_missing INTEGER,
+            trophies_attack REAL,
+            trophies_defense REAL,
+            PRIMARY KEY (player_tag, week_key)
+        )
+    """)
+
+
+def _rows_to_dicts(res):
+    rows = res.rows if hasattr(res, "rows") else []
+    return [{col: row[i] for i, col in enumerate(COLUMNS)} for row in rows]
+
+
+def fetch_ranked(conn, tag=None, week_key=None):
+    query = f"SELECT {', '.join(COLUMNS)} FROM ranked_leagues"
+    clauses, params = [], []
+    if tag is not None:
+        clauses.append("player_tag = ?")
+        params.append(tag)
+    if week_key is not None:
+        clauses.append("week_key = ?")
+        params.append(week_key)
+    if clauses:
+        query += " WHERE " + " AND ".join(clauses)
+    return _rows_to_dicts(conn.execute(query, params))
+
+
+def _loads(value, default):
+    try:
+        return json.loads(value) if value else default
+    except (TypeError, ValueError):
+        return default
+
+
+def _week_order(week_key):
+    """Clé de tri chronologique pour 'Novembre - Semaine 2'."""
+    try:
+        month, week = week_key.split(" - ")
+        return MONTHS.index(month) * 10 + int(week.split()[-1])
+    except (ValueError, IndexError):
+        return 999
+
+
+# ---------------------------------------------------------------------------
+# Calculs
+# ---------------------------------------------------------------------------
+def compute_summary(atk_pcts, nb_3_star, def_trophies, received, expected):
+    """atk_pcts : pourcentages des attaques à 0/1/2 étoiles (liste à plat)."""
+    all_pcts = list(atk_pcts) + [100.0] * nb_3_star
+    avg_destruction = sum(all_pcts) / len(all_pcts) if all_pcts else 0.0
+
+    sum_received = sum(def_trophies)
+    avg_per_def = sum_received / received if received > 0 else 0.0
+    missing = max(0, expected - received)
+    adjusted = sum_received + missing * avg_per_def
+    return {
+        "avg_destruction": round(avg_destruction, 2),
+        "missing": missing,
+        "avg_per_def": avg_per_def,
+        "adjusted_trophies": round(adjusted, 1),
+    }
+
+
+# ---------------------------------------------------------------------------
+# Point d'entrée
+# ---------------------------------------------------------------------------
 def render_mode_ranked():
-    st.subheader("⚔️ Suivi des Ligues Classées Hebdomadaires")
-    
-    # 1. Récupération des comptes disponibles depuis la base de données
+    st.subheader("⚔️ Ligues Classées")
+
     try:
         conn = get_db_client()
-        accounts_res = conn.execute("SELECT player_tag, name FROM accounts ORDER BY name ASC")
-        accounts_list = [(row[0], row[1]) for row in accounts_res.rows]
+        ensure_table(conn)
+        res = conn.execute("SELECT player_tag, name FROM accounts ORDER BY name ASC")
+        accounts = [(row[0], row[1]) for row in res.rows]
     except Exception as e:
-        st.error(f"Erreur lors de la récupération des comptes : {e}")
-        accounts_list = []
-
-    if not accounts_list:
-        st.warning("⚠️ Aucun compte trouvé dans la base de données. Veuillez d'abord ajouter un compte dans l'application.")
+        st.error(f"Erreur d'accès à la base de données : {e}")
         return
 
-    # Sélection du compte
-    account_dict = {f"{name} ({tag})": tag for tag, name in accounts_list}
-    selected_account_label = st.selectbox("Sélectionner le compte", list(account_dict.keys()))
-    selected_tag = account_dict[selected_account_label]
-
-    # 2. Sélection du Mois et de la Semaine
-    col_m1, col_m2 = st.columns(2)
-    with col_m1:
-        selected_month = st.selectbox("Sélectionner le mois", ["Novembre", "Décembre", "Janvier", "Février", "Mars", "Avril", "Mai", "Juin", "Juillet", "Août", "Septembre", "Octobre"])
-    with col_m2:
-        selected_week = st.selectbox("Sélectionner la semaine", ["Semaine 1", "Semaine 2", "Semaine 3", "Semaine 4", "Semaine 5"])
-
-    week_key = f"{selected_month} - {selected_week}"
-
-    # Vérification si des données existent déjà pour ce compte et cette période
-    existing_data = None
     try:
-        res = conn.execute("""
-            SELECT status, league_level, attacks_done, attacks_max, stars_3, stars_2, stars_1, 
-                   stars_0_details, stars_1_details, stars_2_details, avg_destruction, 
-                   def_done, def_max, def_0_details, def_1_details, def_2_details, def_missing,
-                   trophies_attack, trophies_defense
-            FROM ranked_leagues 
-            WHERE player_tag = ? AND week_key = ?
-        """, [selected_tag, week_key])
-        rows = res.rows if hasattr(res, 'rows') else []
-        if rows:
-            existing_data = rows[0]
-    except Exception:
-        pass
+        if not accounts:
+            st.warning("⚠️ Aucun compte en base. Ajoute d'abord un compte dans l'application.")
+            return
 
-    # 3. Sélection du niveau de ligue
-    league_levels = [str(i) for i in range(16, 34)] + ["Légende 3", "Légende 2", "Légende 1"]
-    
-    default_league_index = 0
-    if existing_data and existing_data[1] in league_levels:
-        default_league_index = league_levels.index(existing_data[1])
+        tab_overview, tab_form = st.tabs(["📊 Vue d'ensemble", "📝 Saisir une ligue terminée"])
+        with tab_overview:
+            render_overview(conn, accounts)
+        with tab_form:
+            render_form(conn, accounts)
+    finally:
+        try:
+            conn.close()
+        except Exception:
+            pass
 
-    selected_league = st.selectbox("Niveau de la ligue", league_levels, index=default_league_index)
-    max_attacks_allowed = LEAGUE_ATTACK_QUOTAS.get(selected_league, 10)
-    st.info(f"📌 Quota d'attaques défini pour la ligue **{selected_league}** : **{max_attacks_allowed} attaques** par semaine.")
 
-    if not existing_data:
-        st.info(f"📌 Aucune donnée enregistrée pour le compte **{selected_account_label}** sur la période : **{week_key}**.")
-    else:
-        st.success(f"✅ Données enregistrées existantes pour **{week_key}**. Vous pouvez les modifier et soumettre le formulaire pour mettre à jour.")
+# ---------------------------------------------------------------------------
+# Vue d'ensemble
+# ---------------------------------------------------------------------------
+def render_overview(conn, accounts):
+    try:
+        rows = fetch_ranked(conn)
+    except Exception as e:
+        st.error(f"Erreur de lecture des ligues : {e}")
+        return
+    if not rows:
+        st.info("Aucune ligue enregistrée pour le moment. Utilise l'onglet « Saisir une ligue terminée ».")
+        return
 
-    # 4. Formulaire de saisie détaillée (Matchs Terminés)
-    with st.form(key=f"form_ranked_complete_{selected_tag}_{week_key}"):
-        st.markdown("### 🏹 Saisie détaillée des Attaques")
-        
-        col_atk1, col_atk2, col_atk3 = st.columns(3)
-        with col_atk1:
-            nb_0_star_atk = st.number_input("Nombre d'attaques à 0 ⭐", min_value=0, max_value=max_attacks_allowed, value=0, step=1)
-        with col_atk2:
-            nb_1_star_atk = st.number_input("Nombre d'attaques à 1 ⭐", min_value=0, max_value=max_attacks_allowed, value=0, step=1)
-        with col_atk3:
-            nb_2_star_atk = st.number_input("Nombre d'attaques à 2 ⭐", min_value=0, max_value=max_attacks_allowed, value=0, step=1)
+    names = {tag: name for tag, name in accounts}
+    df = pd.DataFrame(rows)
+    for col in NUM_COLS:
+        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+    df["Compte"] = df["player_tag"].map(names).fillna(df["player_tag"])
+    df["_order"] = df["week_key"].map(_week_order)
+    df["stars_0"] = df["stars_0_details"].map(lambda v: len(_loads(v, [])))
+    df["stars_total"] = 3 * df["stars_3"] + 2 * df["stars_2"] + df["stars_1"]
+    df = df.sort_values("_order")
 
-        # Saisie dynamique des pourcentages exacts par attaque
-        atk_0_percentages = []
-        if nb_0_star_atk > 0:
-            st.markdown("##### Pourcentages exacts (0 ⭐)")
-            cols_0 = st.columns(min(nb_0_star_atk, 4))
-            for i in range(nb_0_star_atk):
-                with cols_0[i % len(cols_0)]:
-                    p = st.number_input(f"Atk 0⭐ #{i+1} (%)", min_value=0.0, max_value=99.9, value=0.0, step=0.1, key=f"atk_0_{i}")
-                    atk_0_percentages.append(p)
+    st.markdown("### Dernière période de chaque compte")
+    for tag, g in df.groupby("player_tag", sort=False):
+        last = g.iloc[-1]
+        prev = g.iloc[-2] if len(g) > 1 else None
+        with st.container(border=True):
+            st.markdown(f"**{last['Compte']}** · {last['week_key']} · {last['status']}")
+            c = st.columns(5)
+            c[0].metric("Ligue", last["league_level"])
+            c[1].metric("Attaques", f"{int(last['attacks_done'])} / {int(last['attacks_max'])}")
+            c[2].metric("Étoiles", f"{int(last['stars_total'])} / {3 * int(last['attacks_max'])}")
+            c[3].metric(
+                "Destruction moy.", f"{last['avg_destruction']:.1f}%",
+                delta=None if prev is None else f"{last['avg_destruction'] - prev['avg_destruction']:+.1f} pt",
+            )
+            c[4].metric(
+                "Trophées déf.", f"{last['trophies_defense']:+.1f}",
+                delta=None if prev is None else f"{last['trophies_defense'] - prev['trophies_defense']:+.1f}",
+            )
 
-        atk_1_percentages = []
-        if nb_1_star_atk > 0:
-            st.markdown("##### Pourcentages exacts (1 ⭐)")
-            cols_1 = st.columns(min(nb_1_star_atk, 4))
-            for i in range(nb_1_star_atk):
-                with cols_1[i % len(cols_1)]:
-                    p = st.number_input(f"Atk 1⭐ #{i+1} (%)", min_value=0.0, max_value=99.9, value=50.0, step=0.1, key=f"atk_1_{i}")
-                    atk_1_percentages.append(p)
+    st.markdown("### Historique d'un compte")
+    account_names = list(dict.fromkeys(df["Compte"]))
+    chosen = st.selectbox("Compte", account_names, key="rk_overview_account")
+    hist = df[df["Compte"] == chosen]
 
-        atk_2_percentages = []
-        if nb_2_star_atk > 0:
-            st.markdown("##### Pourcentages exacts (2 ⭐)")
-            cols_2 = st.columns(min(nb_2_star_atk, 4))
-            for i in range(nb_2_star_atk):
-                with cols_2[i % len(cols_2)]:
-                    p = st.number_input(f"Atk 2⭐ #{i+1} (%)", min_value=0.0, max_value=99.9, value=80.0, step=0.1, key=f"atk_2_{i}")
-                    atk_2_percentages.append(p)
+    chart_df = hist.set_index("week_key")
+    col_a, col_b = st.columns(2)
+    with col_a:
+        st.caption("Destruction moyenne (%)")
+        st.line_chart(chart_df[["avg_destruction"]])
+    with col_b:
+        st.caption("Trophées de défense (ajustés)")
+        st.line_chart(chart_df[["trophies_defense"]])
 
-        total_declared_atk = nb_0_star_atk + nb_1_star_atk + nb_2_star_atk
-        if total_declared_atk > max_attacks_allowed:
-            st.error(f"⚠️ Le nombre total d'attaques déclarées ({total_declared_atk}) dépasse le quota maximal autorisé pour cette ligue ({max_attacks_allowed}).")
+    table = hist[[
+        "week_key", "league_level", "attacks_done", "stars_3", "stars_2", "stars_1", "stars_0",
+        "stars_total", "avg_destruction", "def_done", "def_max", "def_missing", "trophies_defense",
+    ]].rename(columns={
+        "week_key": "Période", "league_level": "Ligue", "attacks_done": "Attaques",
+        "stars_3": "3⭐", "stars_2": "2⭐", "stars_1": "1⭐", "stars_0": "0⭐",
+        "stars_total": "Étoiles", "avg_destruction": "Destr. moy. (%)",
+        "def_done": "Déf. reçues", "def_max": "Déf. attendues", "def_missing": "Déf. manquantes",
+        "trophies_defense": "Trophées déf.",
+    })
+    st.dataframe(table, hide_index=True)
 
-        nb_3_star_atk = max(0, max_attacks_allowed - total_declared_atk)
-        st.info(f"💡 Attaques restantes déduites automatiquement en **3 ⭐** : **{nb_3_star_atk} attaques** (sur un total de {max_attacks_allowed}).")
 
-        st.markdown("---")
-        st.markdown("### 🛡️ Saisie détaillée des Défenses")
+# ---------------------------------------------------------------------------
+# Formulaire "ligue terminée"
+# ---------------------------------------------------------------------------
+def _pct_inputs(title, n, prefill, default, max_value, key):
+    values = []
+    if n <= 0:
+        return values
+    st.markdown(f"##### {title}")
+    cols = st.columns(min(n, 4))
+    for i in range(n):
+        start = prefill[i] if i < len(prefill) else default
+        with cols[i % len(cols)]:
+            values.append(st.number_input(
+                f"#{i + 1} (%)", min_value=0.0, max_value=max_value,
+                value=min(float(start), max_value), step=0.1, key=f"{key}_{i}",
+            ))
+    return values
 
-        col_def1, col_def2, col_def3 = st.columns(3)
-        with col_def1:
-            nb_0_star_def = st.number_input("Nombre de défenses à 0 ⭐ (subies)", min_value=0, value=0, step=1)
-        with col_def2:
-            nb_1_star_def = st.number_input("Nombre de défenses à 1 ⭐ (subies)", min_value=0, value=0, step=1)
-        with col_def3:
-            nb_2_star_def = st.number_input("Nombre de défenses à 2 ⭐ (subies)", min_value=0, value=0, step=1)
 
-        # Pourcentages et trophées pour les défenses
-        def_0_percentages = []
-        def_0_trophies = []
-        if nb_0_star_def > 0:
-            st.markdown("##### Détails des défenses 0 ⭐ (pourcentage et trophées gagnés)")
-            for i in range(nb_0_star_def):
-                c1, c2 = st.columns(2)
-                with c1:
-                    p = st.number_input(f"Def 0⭐ #{i+1} (%)", min_value=0.0, max_value=99.9, value=30.0, key=f"def_0_p_{i}")
-                    def_0_percentages.append(p)
-                with c2:
-                    t = st.number_input(f"Trophées Def 0⭐ #{i+1}", min_value=0, value=5, key=f"def_0_t_{i}")
-                    def_0_trophies.append(t)
-
-        def_1_percentages = []
-        def_1_trophies = []
-        if nb_1_star_def > 0:
-            st.markdown("##### Détails des défenses 1 ⭐ (pourcentage et trophées)")
-            for i in range(nb_1_star_def):
-                c1, c2 = st.columns(2)
-                with c1:
-                    p = st.number_input(f"Def 1⭐ #{i+1} (%)", min_value=0.0, max_value=99.9, value=60.0, key=f"def_1_p_{i}")
-                    def_1_percentages.append(p)
-                with c2:
-                    t = st.number_input(f"Trophées Def 1⭐ #{i+1}", min_value=0, value=0, key=f"def_1_t_{i}")
-                    def_1_trophies.append(t)
-
-        def_2_percentages = []
-        def_2_trophies = []
-        if nb_2_star_def > 0:
-            st.markdown("##### Détails des défenses 2 ⭐ (pourcentage et trophées)")
-            for i in range(nb_2_star_def):
-                c1, c2 = st.columns(2)
-                with c1:
-                    p = st.number_input(f"Def 2⭐ #{i+1} (%)", min_value=0.0, max_value=100.0, value=90.0, key=f"def_2_p_{i}")
-                    def_2_percentages.append(p)
-                with c2:
-                    t = st.number_input(f"Trophées Def 2⭐ #{i+1}", min_value=-50, max_value=0, value=-10, key=f"def_2_t_{i}")
-                    def_2_trophies.append(t)
-
-        st.markdown("##### Gestion des défenses non reçues (Trophées manquants)")
-        total_def_expected = st.number_input("Nombre total de défenses théoriques attendues", min_value=0, value=max_attacks_allowed, step=1)
-        total_def_received = st.number_input("Nombre de défenses réellement reçues et jouées", min_value=0, value=nb_0_star_def + nb_1_star_def + nb_2_star_def, step=1)
-
-        submit_button = st.form_submit_button(label="💾 Enregistrer les résultats de la ligue")
-
-        if submit_button:
-            if total_declared_atk > max_attacks_allowed:
-                st.error("Erreur : Impossible d'enregistrer, le nombre d'attaques déclarées dépasse le quota.")
-                return
-
-            # Calculs automatiques
-            all_received_trophies = def_0_trophies + def_1_trophies + def_2_trophies
-            sum_received_trophies = sum(all_received_trophies)
-            
-            if total_def_received > 0:
-                avg_trophies_per_def = sum_received_trophies / total_def_received
-            else:
-                avg_trophies_per_def = 0.0
-
-            missing_defs = max(0, total_def_expected - total_def_received)
-            adjusted_defense_trophies = sum_received_trophies + (missing_defs * avg_trophies_per_def)
-
-            all_atk_percentages = atk_0_percentages + atk_1_percentages + atk_2_percentages + ([100.0] * nb_3_star_atk)
-            avg_destruction = sum(all_atk_percentages) / len(all_atk_percentages) if all_atk_percentages else 0.0
-
-            import json
-            try:
-                conn.execute("""
-                    INSERT INTO ranked_leagues (
-                        player_tag, week_key, status, league_level, attacks_done, attacks_max, 
-                        stars_3, stars_2, stars_1, stars_0_details, stars_1_details, stars_2_details, 
-                        avg_destruction, def_done, def_max, def_missing, trophies_attack, trophies_defense
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                    ON CONFLICT(player_tag, week_key) DO UPDATE SET 
-                        status = excluded.status,
-                        league_level = excluded.league_level,
-                        attacks_done = excluded.attacks_done,
-                        attacks_max = excluded.attacks_max,
-                        stars_3 = excluded.stars_3,
-                        stars_2 = excluded.stars_2,
-                        stars_1 = excluded.stars_1,
-                        stars_0_details = excluded.stars_0_details,
-                        stars_1_details = excluded.stars_1_details,
-                        stars_2_details = excluded.stars_2_details,
-                        avg_destruction = excluded.avg_destruction,
-                        def_done = excluded.def_done,
-                        def_max = excluded.def_max,
-                        def_missing = excluded.def_missing,
-                        trophies_attack = excluded.trophies_attack,
-                        trophies_defense = excluded.trophies_defense
-                """, [
-                    selected_tag, week_key, "Terminé", selected_league, max_attacks_allowed, max_attacks_allowed,
-                    nb_3_star_atk, nb_2_star_atk, nb_1_star_atk,
-                    json.dumps(atk_0_percentages), json.dumps(atk_1_percentages), json.dumps(atk_2_percentages),
-                    avg_destruction, total_def_received, total_def_expected, missing_defs,
-                    0, adjusted_defense_trophies
-                ])
-                st.success(f"🎉 Résultats enregistrés avec succès pour **{selected_account_label}** ({week_key}) !")
-                st.rerun()
-            except Exception as e:
-                st.error(f"Erreur lors de l'enregistrement en base de données : {e}")
-
-    # 5. Affichage récapitulatif si les données existent déjà
-    if existing_data:
-        st.markdown("---")
-        st.markdown(f"### 📊 Bilan enregistré pour {week_key}")
-        
-        c1, c2, c3, c4 = st.columns(4)
+def _def_inputs(title, n, prefill, default_pct, default_trophy, max_pct, key):
+    pcts, trophies = [], []
+    if n <= 0:
+        return pcts, trophies
+    st.markdown(f"##### {title}")
+    pre_p = prefill.get("pct", []) if isinstance(prefill, dict) else []
+    pre_t = prefill.get("trophies", []) if isinstance(prefill, dict) else []
+    for i in range(n):
+        c1, c2 = st.columns(2)
         with c1:
-            st.metric("Niveau de Ligue", existing_data[1])
+            pcts.append(st.number_input(
+                f"Défense #{i + 1} (%)", min_value=0.0, max_value=max_pct,
+                value=min(float(pre_p[i]) if i < len(pre_p) else default_pct, max_pct),
+                step=0.1, key=f"{key}_p_{i}",
+            ))
         with c2:
-            st.metric("Attaques max", existing_data[3])
-        with c3:
-            st.metric("Destruction Moy.", f"{existing_data[10]:.1f}%")
-        with c4:
-            st.metric("Défenses manq. ajustées", f"{existing_data[18]:+.1f} trophées")
+            trophies.append(st.number_input(
+                f"Trophées défense #{i + 1}", min_value=-60, max_value=60,
+                value=int(pre_t[i]) if i < len(pre_t) else default_trophy,
+                step=1, key=f"{key}_t_{i}",
+            ))
+    return pcts, trophies
+
+
+def render_form(conn, accounts):
+    flash = st.session_state.pop("ranked_flash", None)
+    if flash:
+        st.success(flash)
+
+    # --- Compte, période, ligue -------------------------------------------
+    labels = {f"{name} ({tag})": tag for tag, name in accounts}
+    label = st.selectbox("Compte", list(labels), key="rk_form_account")
+    tag = labels[label]
+
+    c1, c2 = st.columns(2)
+    month = c1.selectbox("Mois", MONTHS, key="rk_form_month")
+    week = c2.selectbox("Semaine", WEEKS, key="rk_form_week")
+    week_key = f"{month} - {week}"
+    k = f"{tag}_{week_key}"
+
+    try:
+        found = fetch_ranked(conn, tag, week_key)
+    except Exception as e:
+        st.error(f"Erreur de lecture : {e}")
+        return
+    existing = found[0] if found else None
+
+    default_idx = LEAGUE_LEVELS.index(existing["league_level"]) if existing and existing["league_level"] in LEAGUE_LEVELS else 0
+    league = st.selectbox("Niveau de la ligue", LEAGUE_LEVELS, index=default_idx, key=f"rk_league_{k}")
+    quota = LEAGUE_ATTACK_QUOTAS[league]
+    st.info(f"📌 Ligue **{league}** : **{quota} attaques** par semaine.")
+
+    if existing:
+        st.success(f"✅ Données existantes pour **{week_key}** : tu peux les modifier et réenregistrer.")
+    else:
+        st.info(f"Aucune donnée pour **{label}** sur **{week_key}**.")
+
+    ex_atk = [_loads(existing.get(f"stars_{i}_details"), []) if existing else [] for i in range(3)]
+    ex_def = [_loads(existing.get(f"def_{i}_details"), {}) if existing else {} for i in range(3)]
+
+    # --- Nombres d'attaques (hors formulaire pour que les champs se mettent à jour) ---
+    st.markdown("### 🏹 Attaques")
+    ca = st.columns(3)
+    n_atk = [
+        ca[i].number_input(
+            f"Attaques à {i} ⭐", min_value=0, max_value=quota,
+            value=min(len(ex_atk[i]), quota), step=1, key=f"rk_natk{i}_{k}_{quota}",
+        )
+        for i in range(3)
+    ]
+    declared_atk = sum(n_atk)
+    nb_3_star = max(0, quota - declared_atk)
+    if declared_atk > quota:
+        st.error(f"⚠️ {declared_atk} attaques déclarées pour un quota de {quota}.")
+    st.info(f"💡 Attaques restantes déduites en **3 ⭐** : **{nb_3_star}** (sur {quota}).")
+
+    # --- Nombres de défenses ---------------------------------------------
+    st.markdown("### 🛡️ Défenses")
+    cd = st.columns(3)
+    n_def = [
+        cd[i].number_input(
+            f"Défenses à {i} ⭐ (subies)", min_value=0,
+            value=len(ex_def[i].get("pct", [])) if isinstance(ex_def[i], dict) else 0,
+            step=1, key=f"rk_ndef{i}_{k}",
+        )
+        for i in range(3)
+    ]
+    declared_def = sum(n_def)
+
+    ce, cr = st.columns(2)
+    expected = ce.number_input(
+        "Défenses théoriques attendues", min_value=0,
+        value=int(existing["def_max"]) if existing and existing["def_max"] else quota,
+        step=1, key=f"rk_dexp_{k}",
+    )
+    prev_recv = int(existing["def_done"]) if existing and existing["def_done"] else 0
+    received = cr.number_input(
+        "Défenses réellement reçues", min_value=declared_def,
+        value=max(declared_def, prev_recv), step=1, key=f"rk_drecv_{k}_{declared_def}",
+    )
+    if expected < received:
+        st.warning("Le nombre de défenses reçues dépasse le nombre attendu : aucune défense manquante ne sera ajoutée.")
+
+    # --- Détails (dans le formulaire) -------------------------------------
+    with st.form(key=f"rk_form_{k}_{quota}"):
+        st.markdown("#### Détail des attaques")
+        atk_pcts = [
+            _pct_inputs("Attaques 0 ⭐", n_atk[0], ex_atk[0], 0.0, 99.9, f"rk_a0_{k}"),
+            _pct_inputs("Attaques 1 ⭐", n_atk[1], ex_atk[1], 50.0, 99.9, f"rk_a1_{k}"),
+            _pct_inputs("Attaques 2 ⭐", n_atk[2], ex_atk[2], 80.0, 99.9, f"rk_a2_{k}"),
+        ]
+
+        st.markdown("#### Détail des défenses")
+        d0_p, d0_t = _def_inputs("Défenses 0 ⭐", n_def[0], ex_def[0], 30.0, 5, 99.9, f"rk_d0_{k}")
+        d1_p, d1_t = _def_inputs("Défenses 1 ⭐", n_def[1], ex_def[1], 60.0, 0, 99.9, f"rk_d1_{k}")
+        d2_p, d2_t = _def_inputs("Défenses 2 ⭐", n_def[2], ex_def[2], 90.0, -10, 100.0, f"rk_d2_{k}")
+
+        submitted = st.form_submit_button("💾 Enregistrer les résultats de la ligue")
+
+    if submitted:
+        if declared_atk > quota:
+            st.error("Impossible d'enregistrer : le nombre d'attaques dépasse le quota.")
+            return
+
+        summary = compute_summary(
+            atk_pcts=atk_pcts[0] + atk_pcts[1] + atk_pcts[2],
+            nb_3_star=nb_3_star,
+            def_trophies=d0_t + d1_t + d2_t,
+            received=received,
+            expected=expected,
+        )
+        try:
+            conn.execute("""
+                INSERT INTO ranked_leagues (
+                    player_tag, week_key, status, league_level, attacks_done, attacks_max,
+                    stars_3, stars_2, stars_1, stars_0_details, stars_1_details, stars_2_details,
+                    avg_destruction, def_done, def_max, def_0_details, def_1_details, def_2_details,
+                    def_missing, trophies_attack, trophies_defense
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(player_tag, week_key) DO UPDATE SET
+                    status = excluded.status,
+                    league_level = excluded.league_level,
+                    attacks_done = excluded.attacks_done,
+                    attacks_max = excluded.attacks_max,
+                    stars_3 = excluded.stars_3,
+                    stars_2 = excluded.stars_2,
+                    stars_1 = excluded.stars_1,
+                    stars_0_details = excluded.stars_0_details,
+                    stars_1_details = excluded.stars_1_details,
+                    stars_2_details = excluded.stars_2_details,
+                    avg_destruction = excluded.avg_destruction,
+                    def_done = excluded.def_done,
+                    def_max = excluded.def_max,
+                    def_0_details = excluded.def_0_details,
+                    def_1_details = excluded.def_1_details,
+                    def_2_details = excluded.def_2_details,
+                    def_missing = excluded.def_missing,
+                    trophies_attack = excluded.trophies_attack,
+                    trophies_defense = excluded.trophies_defense
+            """, [
+                tag, week_key, "Terminé", league, quota, quota,
+                nb_3_star, n_atk[2], n_atk[1],
+                json.dumps(atk_pcts[0]), json.dumps(atk_pcts[1]), json.dumps(atk_pcts[2]),
+                summary["avg_destruction"], received, expected,
+                json.dumps({"pct": d0_p, "trophies": d0_t}),
+                json.dumps({"pct": d1_p, "trophies": d1_t}),
+                json.dumps({"pct": d2_p, "trophies": d2_t}),
+                summary["missing"], 0, summary["adjusted_trophies"],
+            ])
+        except Exception as e:
+            st.error(f"Erreur lors de l'enregistrement : {e}")
+            return
+
+        st.session_state["ranked_flash"] = f"🎉 Résultats enregistrés pour {label} ({week_key})."
+        st.rerun()
+
+    # --- Bilan de la période ---------------------------------------------
+    if existing:
+        st.markdown("---")
+        st.markdown(f"### 📊 Bilan enregistré : {week_key}")
+        stars_total = 3 * (existing["stars_3"] or 0) + 2 * (existing["stars_2"] or 0) + (existing["stars_1"] or 0)
+        m = st.columns(4)
+        m[0].metric("Ligue", existing["league_level"])
+        m[1].metric("Étoiles", f"{stars_total} / {3 * (existing['attacks_max'] or 0)}")
+        m[2].metric("Destruction moy.", f"{(existing['avg_destruction'] or 0):.1f}%")
+        m[3].metric("Trophées déf. ajustés", f"{(existing['trophies_defense'] or 0):+.1f}")
+
