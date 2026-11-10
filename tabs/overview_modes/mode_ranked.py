@@ -33,7 +33,6 @@ NUM_COLS = ["attacks_done", "attacks_max", "stars_3", "stars_2", "stars_1", "avg
 # Base de données (Turso)
 # ---------------------------------------------------------------------------
 def get_db_client():
-    # TODO : si utils.py contient déjà une fonction de connexion, importe-la ici à la place.
     import libsql_client
     url = os.environ.get("TURSO_DATABASE_URL", "https://coc-dashboard-2neuf.aws-eu-west-1.turso.io")
     auth_token = os.environ.get("TURSO_AUTH_TOKEN", "")
@@ -43,7 +42,6 @@ def get_db_client():
 
 
 def ensure_table(conn):
-    """Crée la table si elle n'existe pas (sans effet si elle existe déjà)."""
     conn.execute("""
         CREATE TABLE IF NOT EXISTS ranked_leagues (
             player_tag TEXT NOT NULL,
@@ -55,13 +53,13 @@ def ensure_table(conn):
             stars_3 INTEGER,
             stars_2 INTEGER,
             stars_1 INTEGER,
-            stars_0_ TEXT,
-            stars_1_ TEXT,
-            stars_2_ TEXT,
+            stars_0_details TEXT,
+            stars_1_details TEXT,
+            stars_2_details TEXT,
             avg_destruction REAL,
             def_done INTEGER,
             def_max INTEGER,
-            def_0_ TEXT,
+            def_0_details TEXT,
             def_1_details TEXT,
             def_2_details TEXT,
             def_missing INTEGER,
@@ -70,8 +68,6 @@ def ensure_table(conn):
             PRIMARY KEY (player_tag, week_key)
         )
     """)
-
-    # Table déjà existante : on ajoute les colonnes manquantes
     col_types = {
         "status": "TEXT", "league_level": "TEXT", "attacks_done": "INTEGER", "attacks_max": "INTEGER",
         "stars_3": "INTEGER", "stars_2": "INTEGER", "stars_1": "INTEGER",
@@ -86,7 +82,6 @@ def ensure_table(conn):
         if col not in present:
             conn.execute(f"ALTER TABLE ranked_leagues ADD COLUMN {col} {col_type}")
 
-    # Nécessaire pour le ON CONFLICT(player_tag, week_key) de l'enregistrement
     try:
         conn.execute(
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_ranked_tag_week "
@@ -123,7 +118,6 @@ def _loads(value, default):
 
 
 def _week_order(week_key):
-    """Clé de tri chronologique pour 'Novembre - Semaine 2'."""
     try:
         month, week = week_key.split(" - ")
         return MONTHS.index(month) * 10 + int(week.split()[-1])
@@ -132,22 +126,78 @@ def _week_order(week_key):
 
 
 # ---------------------------------------------------------------------------
-# Calculs
+# Calculs Automatiques des Trophées et Statistiques
 # ---------------------------------------------------------------------------
-def compute_summary(atk_pcts, nb_3_star, def_trophies, received, expected):
-    """atk_pcts : pourcentages des attaques à 0/1/2 étoiles (liste à plat)."""
-    all_pcts = list(atk_pcts) + [100.0] * nb_3_star
-    avg_destruction = sum(all_pcts) / len(all_pcts) if all_pcts else 0.0
+def calculate_attack_trophies(stars, destruction_pct):
+    if stars == 3:
+        return 40
+    elif stars == 2:
+        extra = max(0, destruction_pct - 50)
+        return 16 + int(extra // 3)
+    elif stars == 1:
+        return 6 + int(destruction_pct // 10)
+    elif stars == 0:
+        return int(destruction_pct // 10)
+    return 0
 
-    sum_received = sum(def_trophies)
+
+def calculate_defense_trophies(stars, destruction_pct):
+    return 40 - calculate_attack_trophies(stars, destruction_pct)
+
+
+def compute_summary(atk_pcts_by_star, nb_3_star, def_details_list, received, expected):
+    """
+    atk_pcts_by_star : tuple/liste de 3 listes [pcts_0_star, pcts_1_star, pcts_2_star]
+    def_details_list : tuple/liste de 3 listes de dicts [{"pct": ...}, ...] pour les defs 0, 1, 2 étoiles
+    """
+    # 1. Calcul des attaques
+    flat_atk_pcts = []
+    total_atk_trophies = 0
+
+    # 0 étoile
+    for p in atk_pcts_by_star[0]:
+        flat_atk_pcts.append(float(p))
+        total_atk_trophies += calculate_attack_trophies(0, p)
+    # 1 étoile
+    for p in atk_pcts_by_star[1]:
+        flat_atk_pcts.append(float(p))
+        total_atk_trophies += calculate_attack_trophies(1, p)
+    # 2 étoiles
+    for p in atk_pcts_by_star[2]:
+        flat_atk_pcts.append(float(p))
+        total_atk_trophies += calculate_attack_trophies(2, p)
+    # 3 étoiles (100% et 40 trophées chacunes)
+    for _ in range(nb_3_star):
+        flat_atk_pcts.append(100.0)
+        total_atk_trophies += 40
+
+    avg_destruction = sum(flat_atk_pcts) / len(flat_atk_pcts) if flat_atk_pcts else 0.0
+
+    # 2. Calcul des défenses
+    def_trophies_collected = []
+    # defs 0 étoile subies (donc l'adversaire a fait 0⭐, on gagne 40 trophées)
+    for d in def_details_list[0]:
+        p = d.get("pct", 0)
+        def_trophies_collected.append(calculate_defense_trophies(0, p))
+    # defs 1 étoile subies
+    for d in def_details_list[1]:
+        p = d.get("pct", 0)
+        def_trophies_collected.append(calculate_defense_trophies(1, p))
+    # defs 2 étoiles subies
+    for d in def_details_list[2]:
+        p = d.get("pct", 0)
+        def_trophies_collected.append(calculate_defense_trophies(2, p))
+
+    sum_received = sum(def_trophies_collected)
     avg_per_def = sum_received / received if received > 0 else 0.0
     missing = max(0, expected - received)
-    adjusted = sum_received + missing * avg_per_def
+    adjusted_defense_trophies = sum_received + missing * avg_per_def
+
     return {
         "avg_destruction": round(avg_destruction, 2),
         "missing": missing,
-        "avg_per_def": avg_per_def,
-        "adjusted_trophies": round(adjusted, 1),
+        "trophies_attack": total_atk_trophies,
+        "trophies_defense": round(adjusted_defense_trophies, 1),
     }
 
 
@@ -212,15 +262,16 @@ def render_overview(conn, accounts):
         prev = g.iloc[-2] if len(g) > 1 else None
         with st.container(border=True):
             st.markdown(f"**{last['Compte']}** · {last['week_key']} · {last['status']}")
-            c = st.columns(5)
+            c = st.columns(6)
             c[0].metric("Ligue", last["league_level"])
             c[1].metric("Attaques", f"{int(last['attacks_done'])} / {int(last['attacks_max'])}")
             c[2].metric("Étoiles", f"{int(last['stars_total'])} / {3 * int(last['attacks_max'])}")
-            c[3].metric(
-                "Destruction moy.", f"{last['avg_destruction']:.1f}%",
+            c[3].metric("Trophées atk", f"{int(last['trophies_attack']):+d}")
+            c[4].metric(
+                "Destr. moy.", f"{last['avg_destruction']:.1f}%",
                 delta=None if prev is None else f"{last['avg_destruction'] - prev['avg_destruction']:+.1f} pt",
             )
-            c[4].metric(
+            c[5].metric(
                 "Trophées déf.", f"{last['trophies_defense']:+.1f}",
                 delta=None if prev is None else f"{last['trophies_defense'] - prev['trophies_defense']:+.1f}",
             )
@@ -236,16 +287,16 @@ def render_overview(conn, accounts):
         st.caption("Destruction moyenne (%)")
         st.line_chart(chart_df[["avg_destruction"]])
     with col_b:
-        st.caption("Trophées de défense (ajustés)")
-        st.line_chart(chart_df[["trophies_defense"]])
+        st.caption("Trophées (Attaque & Défense)")
+        st.line_chart(chart_df[["trophies_attack", "trophies_defense"]])
 
     table = hist[[
         "week_key", "league_level", "attacks_done", "stars_3", "stars_2", "stars_1", "stars_0",
-        "stars_total", "avg_destruction", "def_done", "def_max", "def_missing", "trophies_defense",
+        "stars_total", "avg_destruction", "trophies_attack", "def_done", "def_max", "def_missing", "trophies_defense",
     ]].rename(columns={
         "week_key": "Période", "league_level": "Ligue", "attacks_done": "Attaques",
         "stars_3": "3⭐", "stars_2": "2⭐", "stars_1": "1⭐", "stars_0": "0⭐",
-        "stars_total": "Étoiles", "avg_destruction": "Destr. moy. (%)",
+        "stars_total": "Étoiles", "avg_destruction": "Destr. moy. (%)", "trophies_attack": "Trophées atk",
         "def_done": "Déf. reçues", "def_max": "Déf. attendues", "def_missing": "Déf. manquantes",
         "trophies_defense": "Trophées déf.",
     })
@@ -271,28 +322,20 @@ def _pct_inputs(title, n, prefill, default, max_value, key):
     return values
 
 
-def _def_inputs(title, n, prefill, default_pct, default_trophy, max_pct, key):
-    pcts, trophies = [], []
+def _def_inputs_pct_only(title, n, prefill_list, default_pct, max_pct, key):
+    pcts = []
     if n <= 0:
-        return pcts, trophies
+        return pcts
     st.markdown(f"##### {title}")
-    pre_p = prefill.get("pct", []) if isinstance(prefill, dict) else []
-    pre_t = prefill.get("trophies", []) if isinstance(prefill, dict) else []
+    cols = st.columns(min(n, 4))
     for i in range(n):
-        c1, c2 = st.columns(2)
-        with c1:
+        start = prefill_list[i] if i < len(prefill_list) else default_pct
+        with cols[i % len(cols)]:
             pcts.append(st.number_input(
-                f"Défense #{i + 1} (%)", min_value=0, max_value=max_pct,
-                value=min(pre_p[i] if i < len(pre_p) else default_pct, max_pct),
-                step=1, key=f"{key}_p_{i}",
+                f"Déf #{i + 1} (%)", min_value=0, max_value=max_pct,
+                value=min(start, max_pct), step=1, key=f"{key}_p_{i}",
             ))
-        with c2:
-            trophies.append(st.number_input(
-                f"Trophées défense #{i + 1}", min_value=-60, max_value=60,
-                value=int(pre_t[i]) if i < len(pre_t) else default_trophy,
-                step=1, key=f"{key}_t_{i}",
-            ))
-    return pcts, trophies
+    return pcts
 
 
 def render_form(conn, accounts):
@@ -300,7 +343,6 @@ def render_form(conn, accounts):
     if flash:
         st.success(flash)
 
-    # --- Compte, période, ligue -------------------------------------------
     labels = {f"{name} ({tag})": tag for tag, name in accounts}
     label = st.selectbox("Compte", list(labels), key="rk_form_account")
     tag = labels[label]
@@ -329,9 +371,19 @@ def render_form(conn, accounts):
         st.info(f"Aucune donnée pour **{label}** sur **{week_key}**.")
 
     ex_atk = [_loads(existing.get(f"stars_{i}_details"), []) if existing else [] for i in range(3)]
-    ex_def = [_loads(existing.get(f"def_{i}_details"), {}) if existing else {} for i in range(3)]
+    
+    # Récupération sécurisée des pourcentages de défense enregistrés
+    ex_def_pcts = []
+    for i in range(3):
+        d_data = _loads(existing.get(f"def_{i}_details"), {}) if existing else {}
+        if isinstance(d_data, dict):
+            ex_def_pcts.append(d_data.get("pct", []))
+        elif isinstance(d_data, list): # compatibilité ancienne structure
+            ex_def_pcts.append(d_data)
+        else:
+            ex_def_pcts.append([])
 
-    # --- Nombres d'attaques (hors formulaire pour que les champs se mettent à jour) ---
+    # --- Nombres d'attaques ---
     st.markdown("### 🏹 Attaques")
     ca = st.columns(3)
     n_atk = [
@@ -347,20 +399,18 @@ def render_form(conn, accounts):
         st.error(f"⚠️ {declared_atk} attaques déclarées pour un quota de {quota}.")
     st.info(f"💡 Attaques restantes déduites en **3 ⭐** : **{nb_3_star}** (sur {quota}).")
 
-    # --- Nombres de défenses ---------------------------------------------
-    st.markdown("### 🛡️ Défenses")
+    # --- Nombres de défenses ---
+    st.markdown("### 🛡️ Défenses (Subies)")
     cd = st.columns(3)
     n_def = [
         cd[i].number_input(
-            f"Défenses à {i} ⭐ (subies)", min_value=0,
-            value=len(ex_def[i].get("pct", [])) if isinstance(ex_def[i], dict) else 0,
-            step=1, key=f"rk_ndef{i}_{k}",
+            f"Défenses à {i} ⭐ subies", min_value=0,
+            value=len(ex_def_pcts[i]), step=1, key=f"rk_ndef{i}_{k}",
         )
         for i in range(3)
     ]
     declared_def = sum(n_def)
 
-    # Défenses attendues = quota d'attaques de la ligue
     expected = quota
     prev_recv = int(existing["def_done"]) if existing and existing["def_done"] else 0
     received = st.number_input(
@@ -371,21 +421,21 @@ def render_form(conn, accounts):
     )
     missing_preview = max(0, expected - received)
     if missing_preview:
-        st.info(f"💡 {missing_preview} défense(s) manquante(s) : la moyenne de trophées par défense sera ajoutée pour chacune.")
+        st.info(f"💡 {missing_preview} défense(s) manquante(s) : la moyenne de trophées sera complétée automatiquement.")
 
-    # --- Détails (dans le formulaire) -------------------------------------
+    # --- Formulaire de saisie ---
     with st.form(key=f"rk_form_{k}_{quota}"):
-        st.markdown("#### Détail des attaques")
+        st.markdown("#### Pourcentages des attaques")
         atk_pcts = [
             _pct_inputs("Attaques 0 ⭐", n_atk[0], ex_atk[0], 0, 49, f"rk_a0_{k}"),
             _pct_inputs("Attaques 1 ⭐", n_atk[1], ex_atk[1], 1, 99, f"rk_a1_{k}"),
             _pct_inputs("Attaques 2 ⭐", n_atk[2], ex_atk[2], 50, 99, f"rk_a2_{k}"),
         ]
 
-        st.markdown("#### Détail des défenses")
-        d0_p, d0_t = _def_inputs("Défenses 0 ⭐", n_def[0], ex_def[0], 0, 30, 49, f"rk_d0_{k}")
-        d1_p, d1_t = _def_inputs("Défenses 1 ⭐", n_def[1], ex_def[1], 1, 20, 99, f"rk_d1_{k}")
-        d2_p, d2_t = _def_inputs("Défenses 2 ⭐", n_def[2], ex_def[2], 50, 10, 99, f"rk_d2_{k}")
+        st.markdown("#### Pourcentages des défenses subies")
+        d0_pcts = _def_inputs_pct_only("Défenses 0 ⭐ (adversaire a fait 0⭐)", n_def[0], ex_def_pcts[0], 25, 49, f"rk_d0_{k}")
+        d1_pcts = _def_inputs_pct_only("Défenses 1 ⭐ (adversaire a fait 1⭐)", n_def[1], ex_def_pcts[1], 50, 99, f"rk_d1_{k}")
+        d2_pcts = _def_inputs_pct_only("Défenses 2 ⭐ (adversaire a fait 2⭐)", n_def[2], ex_def_pcts[2], 80, 99, f"rk_d2_{k}")
 
         submitted = st.form_submit_button("💾 Enregistrer les résultats de la ligue")
 
@@ -394,13 +444,22 @@ def render_form(conn, accounts):
             st.error("Impossible d'enregistrer : le nombre d'attaques dépasse le quota.")
             return
 
+        # Construction des listes de détails de défense avec leurs trophées calculés automatiquement
+        def_details_structured = [
+            [{"pct": p, "trophies": calculate_defense_trophies(0, p)} for p in d0_pcts],
+            [{"pct": p, "trophies": calculate_defense_trophies(1, p)} for p in d1_pcts],
+            [{"pct": p, "trophies": calculate_defense_trophies(2, p)} for p in d2_pcts],
+        ]
+        flat_def_trophies = [item["trophies"] for sublist in def_details_structured for item in sublist]
+
         summary = compute_summary(
-            atk_pcts=atk_pcts[0] + atk_pcts[1] + atk_pcts[2],
+            atk_pcts_by_star=atk_pcts,
             nb_3_star=nb_3_star,
-            def_trophies=d0_t + d1_t + d2_t,
+            def_details_list=def_details_structured,
             received=received,
             expected=expected,
         )
+
         try:
             conn.execute("""
                 INSERT INTO ranked_leagues (
@@ -434,10 +493,10 @@ def render_form(conn, accounts):
                 nb_3_star, n_atk[2], n_atk[1],
                 json.dumps(atk_pcts[0]), json.dumps(atk_pcts[1]), json.dumps(atk_pcts[2]),
                 summary["avg_destruction"], received, expected,
-                json.dumps({"pct": d0_p, "trophies": d0_t}),
-                json.dumps({"pct": d1_p, "trophies": d1_t}),
-                json.dumps({"pct": d2_p, "trophies": d2_t}),
-                summary["missing"], 0, summary["adjusted_trophies"],
+                json.dumps({"pct": d0_pcts, "trophies": [d["trophies"] for d in def_details_structured[0]]}),
+                json.dumps({"pct": d1_pcts, "trophies": [d["trophies"] for d in def_details_structured[1]]}),
+                json.dumps({"pct": d2_pcts, "trophies": [d["trophies"] for d in def_details_structured[2]]}),
+                summary["missing"], summary["trophies_attack"], summary["trophies_defense"],
             ])
         except Exception as e:
             st.error(f"Erreur lors de l'enregistrement : {e}")
@@ -446,13 +505,14 @@ def render_form(conn, accounts):
         st.session_state["ranked_flash"] = f"🎉 Résultats enregistrés pour {label} ({week_key})."
         st.rerun()
 
-    # --- Bilan de la période ---------------------------------------------
+    # --- Bilan de la période ---
     if existing:
         st.markdown("---")
         st.markdown(f"### 📊 Bilan enregistré : {week_key}")
         stars_total = 3 * (existing["stars_3"] or 0) + 2 * (existing["stars_2"] or 0) + (existing["stars_1"] or 0)
-        m = st.columns(4)
+        m = st.columns(5)
         m[0].metric("Ligue", existing["league_level"])
         m[1].metric("Étoiles", f"{stars_total} / {3 * (existing['attacks_max'] or 0)}")
-        m[2].metric("Destruction moy.", f"{(existing['avg_destruction'] or 0):.1f}%")
-        m[3].metric("Trophées déf. ajustés", f"{(existing['trophies_defense'] or 0):+.1f}")
+        m[2].metric("Trophées atk", f"{int(existing['trophies_attack'] or 0):+d}")
+        m[3].metric("Destruction moy.", f"{(existing['avg_destruction'] or 0):.1f}%")
+        m[4].metric("Trophées déf. ajustés", f"{(existing['trophies_defense'] or 0):+.1f}")
