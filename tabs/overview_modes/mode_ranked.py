@@ -197,7 +197,7 @@ def render_mode_ranked():
     try:
         conn = get_db_client()
         ensure_table(conn)
-        res = conn.execute("SELECT player_tag, name FROM accounts ORDER BY name ASC")
+        res = conn.execute("SELECT player_tag, name FROM accounts ORDER BY display_order ASC, name ASC")
         accounts = [(row[0], row[1]) for row in res.rows]
     except Exception as e:
         st.error(f"Erreur d'accès à la base de données : {e}")
