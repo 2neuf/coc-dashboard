@@ -55,13 +55,13 @@ def ensure_table(conn):
             stars_3 INTEGER,
             stars_2 INTEGER,
             stars_1 INTEGER,
-            stars_0_details TEXT,
-            stars_1_details TEXT,
-            stars_2_details TEXT,
+            stars_0_ TEXT,
+            stars_1_ TEXT,
+            stars_2_ TEXT,
             avg_destruction REAL,
             def_done INTEGER,
             def_max INTEGER,
-            def_0_details TEXT,
+            def_0_ TEXT,
             def_1_details TEXT,
             def_2_details TEXT,
             def_missing INTEGER,
@@ -377,15 +377,15 @@ def render_form(conn, accounts):
     with st.form(key=f"rk_form_{k}_{quota}"):
         st.markdown("#### Détail des attaques")
         atk_pcts = [
-            _pct_inputs("Attaques 0 ⭐", n_atk[0], ex_atk[0], 0.0, 99.9, f"rk_a0_{k}"),
-            _pct_inputs("Attaques 1 ⭐", n_atk[1], ex_atk[1], 50.0, 99.9, f"rk_a1_{k}"),
-            _pct_inputs("Attaques 2 ⭐", n_atk[2], ex_atk[2], 80.0, 99.9, f"rk_a2_{k}"),
+            _pct_inputs("Attaques 0 ⭐", n_atk[0], ex_atk[0], 0, 49, f"rk_a0_{k}"),
+            _pct_inputs("Attaques 1 ⭐", n_atk[1], ex_atk[1], 1, 99, f"rk_a1_{k}"),
+            _pct_inputs("Attaques 2 ⭐", n_atk[2], ex_atk[2], 50, 99, f"rk_a2_{k}"),
         ]
 
         st.markdown("#### Détail des défenses")
-        d0_p, d0_t = _def_inputs("Défenses 0 ⭐", n_def[0], ex_def[0], 30.0, 5, 99.9, f"rk_d0_{k}")
-        d1_p, d1_t = _def_inputs("Défenses 1 ⭐", n_def[1], ex_def[1], 60.0, 0, 99.9, f"rk_d1_{k}")
-        d2_p, d2_t = _def_inputs("Défenses 2 ⭐", n_def[2], ex_def[2], 90.0, -10, 100.0, f"rk_d2_{k}")
+        d0_p, d0_t = _def_inputs("Défenses 0 ⭐", n_def[0], ex_def[0], 0, 30, 49, f"rk_d0_{k}")
+        d1_p, d1_t = _def_inputs("Défenses 1 ⭐", n_def[1], ex_def[1], 1, 20, 99, f"rk_d1_{k}")
+        d2_p, d2_t = _def_inputs("Défenses 2 ⭐", n_def[2], ex_def[2], 50, 10, 99, f"rk_d2_{k}")
 
         submitted = st.form_submit_button("💾 Enregistrer les résultats de la ligue")
 
