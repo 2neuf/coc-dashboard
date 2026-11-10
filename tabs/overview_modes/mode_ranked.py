@@ -208,7 +208,11 @@ def render_mode_ranked():
             st.warning("⚠️ Aucun compte en base. Ajoute d'abord un compte dans l'application.")
             return
 
-        tab_overview, tab_form = st.tabs(["📊 Vue d'ensemble", "📝 Saisir une ligue terminée"])
+        # Gestion du basculement d'onglet automatique via la session
+        if "ranked_active_tab" not in st.session_state:
+            st.session_state["ranked_active_tab"] = 0
+
+        tab_overview, tab_form = st.tabs(["📊 Vue d'ensemble", "📝 Saisir / Modifier une ligue"])
         with tab_overview:
             render_overview(conn, accounts)
         with tab_form:
@@ -289,9 +293,22 @@ def render_overview(conn, accounts):
     })
     st.dataframe(table, hide_index=True)
 
+    # ✏️ Raccourci pour modifier une semaine directement
+    st.markdown("#### ✏️ Modifier une semaine enregistrée")
+    selected_row_to_edit = st.selectbox(
+        "Choisir la semaine à modifier", 
+        hist["week_key"].tolist(), 
+        key="select_edit_week"
+    )
+    if st.button("📝 Charger et modifier cette semaine"):
+        tag_to_edit = hist[hist["week_key"] == selected_row_to_edit]["player_tag"].values[0]
+        st.session_state["edit_tag"] = tag_to_edit
+        st.session_state["edit_week_key"] = selected_row_to_edit
+        st.success(f"Période **{selected_row_to_edit}** sélectionnée ! Rendez-vous dans l'onglet 'Saisir / Modifier une ligue'.")
+
 
 # ---------------------------------------------------------------------------
-# Formulaire "ligue terminée"
+# Formulaire "ligue terminée" (Ajout ou Modification)
 # ---------------------------------------------------------------------------
 def _pct_inputs(title, n, prefill, default, max_value, key):
     values = []
@@ -331,12 +348,34 @@ def render_form(conn, accounts):
         st.success(flash)
 
     labels = {f"{name} ({tag})": tag for tag, name in accounts}
-    label = st.selectbox("Compte", list(labels), key="rk_form_account")
+    
+    # Prise en compte du raccourci d'édition s'il a été utilisé depuis la vue d'ensemble
+    default_acc_idx = 0
+    if "edit_tag" in st.session_state:
+        for idx, (lbl, t) in enumerate(labels.items()):
+            if t == st.session_state["edit_tag"]:
+                default_acc_idx = idx
+                break
+
+    label = st.selectbox("Compte", list(labels), index=default_acc_idx, key="rk_form_account")
     tag = labels[label]
 
     c1, c2 = st.columns(2)
-    month = c1.selectbox("Mois", MONTHS, key="rk_form_month")
-    week = c2.selectbox("Semaine", WEEKS, key="rk_form_week")
+    
+    default_month_idx = 0
+    default_week_idx = 0
+    if "edit_week_key" in st.session_state:
+        try:
+            m_part, w_part = st.session_state["edit_week_key"].split(" - ")
+            if m_part in MONTHS:
+                default_month_idx = MONTHS.index(m_part)
+            if w_part in WEEKS:
+                default_week_idx = WEEKS.index(w_part)
+        except Exception:
+            pass
+
+    month = c1.selectbox("Mois", MONTHS, index=default_month_idx, key="rk_form_month")
+    week = c2.selectbox("Semaine", WEEKS, index=default_week_idx, key="rk_form_week")
     week_key = f"{month} - {week}"
     k = f"{tag}_{week_key}"
 
@@ -353,9 +392,9 @@ def render_form(conn, accounts):
     st.info(f"📌 Ligue **{league}** : **{quota} attaques** par semaine.")
 
     if existing:
-        st.success(f"✅ Données existantes pour **{week_key}** : tu peux les modifier et réenregistrer.")
+        st.warning(f"✏️ **Mode Modification** : Des données existent déjà pour **{week_key}**. Tu peux modifier les valeurs ci-dessous et réenregistrer.")
     else:
-        st.info(f"Aucune donnée pour **{label}** sur **{week_key}**.")
+        st.info(f"➕ **Mode Création** : Aucune donnée pour **{label}** sur **{week_key}**.")
 
     ex_atk = [_loads(existing.get(f"stars_{i}_details"), []) if existing else [] for i in range(3)]
     
@@ -423,7 +462,8 @@ def render_form(conn, accounts):
         d1_pcts = _def_inputs_pct_only("Défenses 1 ⭐ (adversaire a fait 1⭐)", n_def[1], ex_def_pcts[1], 50, 99, f"rk_d1_{k}")
         d2_pcts = _def_inputs_pct_only("Défenses 2 ⭐ (adversaire a fait 2⭐)", n_def[2], ex_def_pcts[2], 80, 99, f"rk_d2_{k}")
 
-        submitted = st.form_submit_button("💾 Enregistrer les résultats de la ligue")
+        btn_label = "💾 Mettre à jour la semaine" if existing else "💾 Enregistrer la nouvelle semaine"
+        submitted = st.form_submit_button(btn_label)
 
     if submitted:
         if declared_atk > quota:
@@ -486,7 +526,11 @@ def render_form(conn, accounts):
             st.error(f"Erreur lors de l'enregistrement : {e}")
             return
 
-        st.session_state["ranked_flash"] = f"🎉 Résultats enregistrés pour {label} ({week_key})."
+        # Nettoyage des clés temporaires de session d'édition
+        st.session_state.pop("edit_tag", None)
+        st.session_state.pop("edit_week_key", None)
+
+        st.session_state["ranked_flash"] = f"🎉 Résultats mis à jour avec succès pour {label} ({week_key}) !"
         st.rerun()
 
     # --- Bilan de la période ---
