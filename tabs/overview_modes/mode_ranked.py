@@ -149,29 +149,32 @@ def render_mode_ranked():
     st.markdown("""
         <style>
             div.block-container { padding-top: 1rem; padding-bottom: 1rem; }
-            [data-testid="stVerticalBlock"] { gap: 0.15rem !important; }
+            [data-testid="stVerticalBlock"] { gap: 0.1rem !important; }
             [data-testid="stHorizontalBlock"] { align-items: center !important; }
             hr { margin: 0.1rem 0px !important; border-color: #2c2c2c !important; }
+            
+            /* Alignement précis et hauteur uniforme des boutons */
             .stButton button { 
-                padding: 0px 0.55rem !important; 
-                height: 36px !important; 
-                min-height: 36px !important; 
-                font-size: 1.05rem !important; 
+                padding: 0px 0.4rem !important; 
+                height: 32px !important; 
+                min-height: 32px !important; 
+                font-size: 1rem !important; 
                 font-weight: bold !important;
-                line-height: 36px !important;
+                line-height: 32px !important;
+                margin-top: -4px !important;
             }
             div[data-baseweb="select"] > div { 
-                min-height: 36px !important; 
-                height: 36px !important;
+                min-height: 34px !important; 
+                height: 34px !important;
                 padding-top: 0px !important; 
                 padding-bottom: 0px !important; 
-                font-size: 1rem !important;
+                font-size: 0.95rem !important;
             }
             .ranked-cell {
                 margin: 0 !important;
                 padding: 0 !important;
-                height: 36px !important;
-                line-height: 36px !important;
+                height: 34px !important;
+                line-height: 34px !important;
                 font-size: 1.05rem !important;
                 white-space: nowrap !important;
             }
@@ -267,7 +270,7 @@ def render_overview(conn, accounts):
 
         cols = st.columns(header_cols)
         
-        # 1. Mode (Texte simple par défaut, affichage du selectbox si édition activée)
+        # 1. Mode
         with cols[0]:
             edit_mode_key = f"edit_m_{tag}"
             if st.session_state.get(edit_mode_key, False):
@@ -277,7 +280,7 @@ def render_overview(conn, accounts):
                     st.session_state[edit_mode_key] = False
                     st.rerun()
             else:
-                mc1, mc2 = st.columns([2, 1])
+                mc1, mc2 = st.columns([2.2, 1])
                 mc1.markdown(f"<p class='ranked-cell' style='font-size:0.9rem;'>{tracking_mode}</p>", unsafe_allow_html=True)
                 if mc2.button("✏️", key=f"btn_m_{tag}"):
                     st.session_state[edit_mode_key] = True
@@ -287,7 +290,7 @@ def render_overview(conn, accounts):
         with cols[1]:
             st.markdown(f"<p class='ranked-cell'>{name}</p>", unsafe_allow_html=True)
 
-        # 3. Ligue (Texte simple par défaut, affichage du selectbox si édition activée)
+        # 3. Ligue
         with cols[2]:
             edit_lg_key = f"edit_l_{tag}"
             if st.session_state.get(edit_lg_key, False):
@@ -298,7 +301,7 @@ def render_overview(conn, accounts):
                     st.session_state[edit_lg_key] = False
                     st.rerun()
             else:
-                lc1, lc2 = st.columns([2, 1])
+                lc1, lc2 = st.columns([2.2, 1])
                 lc1.markdown(f"<p class='ranked-cell' style='font-size:0.9rem;'>{league}</p>", unsafe_allow_html=True)
                 if lc2.button("✏️", key=f"btn_l_{tag}"):
                     st.session_state[edit_lg_key] = True
@@ -308,17 +311,17 @@ def render_overview(conn, accounts):
         with cols[3]:
             st.markdown(f"<p class='ranked-cell'>{total_attacks}/{quota}</p>", unsafe_allow_html=True)
 
-        # 5. 3⭐ et son bouton "+"
+        # 5. 3⭐ et son bouton "+" parfaitement alignés
         with cols[4]:
-            sc1, sc2 = st.columns([0.8, 1])
+            sc1, sc2 = st.columns([1, 1])
             sc1.markdown(f"<p class='ranked-cell'>{s3}</p>", unsafe_allow_html=True)
             if sc2.button("+", key=f"b3_{tag}"):
                 _add_attack(conn, tag, current_week_key, 3, 100.0, tracking_mode)
                 st.rerun()
 
-        # 6. 2⭐ et son bouton "+"
+        # 6. 2⭐ et son bouton "+" parfaitement alignés
         with cols[5]:
-            sc1, sc2 = st.columns([0.8, 1])
+            sc1, sc2 = st.columns([1, 1])
             sc1.markdown(f"<p class='ranked-cell'>{s2}</p>", unsafe_allow_html=True)
             if sc2.button("+", key=f"b2_{tag}"):
                 if tracking_mode == "Globale":
@@ -327,9 +330,9 @@ def render_overview(conn, accounts):
                 else:
                     st.session_state[f"p_atk_{tag}"] = 2
 
-        # 7. 1⭐ et son bouton "+"
+        # 7. 1⭐ et son bouton "+" parfaitement alignés
         with cols[6]:
-            sc1, sc2 = st.columns([0.8, 1])
+            sc1, sc2 = st.columns([1, 1])
             sc1.markdown(f"<p class='ranked-cell'>{s1}</p>", unsafe_allow_html=True)
             if sc2.button("+", key=f"b1_{tag}"):
                 if tracking_mode == "Globale":
@@ -338,9 +341,9 @@ def render_overview(conn, accounts):
                 else:
                     st.session_state[f"p_atk_{tag}"] = 1
 
-        # 8. 0⭐ et son bouton "+"
+        # 8. 0⭐ et son bouton "+" parfaitement alignés
         with cols[7]:
-            sc1, sc2 = st.columns([0.8, 1])
+            sc1, sc2 = st.columns([1, 1])
             sc1.markdown(f"<p class='ranked-cell'>{s0_count}</p>", unsafe_allow_html=True)
             if sc2.button("+", key=f"b0_{tag}"):
                 if tracking_mode == "Globale":
@@ -357,7 +360,6 @@ def render_overview(conn, accounts):
         with cols[9]:
             st.markdown(f"<p class='ranked-cell'><b>{total_trophies:+.0f}</b></p>", unsafe_allow_html=True)
 
-        # Popup mini pour le mode précis
         if st.session_state.get(f"p_atk_{tag}") is not None:
             star_val = st.session_state[f"p_atk_{tag}"]
             with st.form(key=f"f_prec_{tag}"):
@@ -488,7 +490,7 @@ def render_form(conn, accounts):
 
     if submitted:
         flat_atk = [p for sub in atk_pcts for p in sub] + ([100.0] * nb_3_star)
-        avg_dest = sum(flat_atk) / len(flat_atk) if flat_atk else 0.0
+        avg_dest = sum(flat_tk) / len(flat_atk) if flat_atk else 0.0
         t_atk = sum(calculate_attack_trophies(0, p) for p in atk_pcts[0]) + \
                 sum(calculate_attack_trophies(1, p) for p in atk_pcts[1]) + \
                 sum(calculate_attack_trophies(2, p) for p in atk_pcts[2]) + (nb_3_star * 40)
