@@ -146,13 +146,46 @@ def calculate_defense_trophies(stars, destruction_pct, is_global=False):
 # Point d'entrée
 # ---------------------------------------------------------------------------
 def render_mode_ranked():
-    # Injection CSS pour réduire drastiquement les marges et compacter les lignes
+    # CSS sur-mesure : compactage vertical maximal + alignement hauteur combolist + police agrandie
     st.markdown("""
         <style>
             div.block-container { padding-top: 1rem; padding-bottom: 1rem; }
-            hr { margin: 0.3rem 0px !important; border-color: #333 !important; }
-            .stButton button { padding: 0.1rem 0.4rem !important; min-height: 1.5rem !important; font-size: 0.8rem !important; }
-            div[data-baseweb="select"] > div { min-height: 2rem !important; padding-top: 0px !important; padding-bottom: 0px !important; }
+            
+            /* Suppression des espacements entre les lignes de colonnes */
+            [data-testid="stVerticalBlock"] { gap: 0.15rem !important; }
+            [data-testid="stHorizontalBlock"] { align-items: center !important; }
+            
+            /* Lignes séparatrices ultra-fines */
+            hr { margin: 0.1rem 0px !important; border-color: #2c2c2c !important; }
+            
+            /* Uniformisation de la hauteur et de la police des boutons '+' avec les listes déroulantes */
+            .stButton button { 
+                padding: 0px 0.55rem !important; 
+                height: 36px !important; 
+                min-height: 36px !important; 
+                font-size: 1.05rem !important; 
+                font-weight: bold !important;
+                line-height: 36px !important;
+            }
+            
+            /* Uniformisation de la hauteur et de la police des listes déroulantes */
+            div[data-baseweb="select"] > div { 
+                min-height: 36px !important; 
+                height: 36px !important;
+                padding-top: 0px !important; 
+                padding-bottom: 0px !important; 
+                font-size: 1rem !important;
+            }
+            
+            /* Style des cellules texte alignées sur 36px */
+            .ranked-cell {
+                margin: 0 !important;
+                padding: 0 !important;
+                height: 36px !important;
+                line-height: 36px !important;
+                font-size: 1.05rem !important;
+                white-space: nowrap !important;
+            }
         </style>
     """, unsafe_allow_html=True)
 
@@ -201,22 +234,22 @@ def render_overview(conn, accounts):
     
     df_week = pd.DataFrame(rows) if rows else pd.DataFrame(columns=COLUMNS)
 
-    st.markdown("---")
+    st.markdown("<hr>", unsafe_allow_html=True)
     
-    header_cols = [0.8, 1.2, 1.0, 0.8, 1.0, 1.0, 1.0, 1.0, 0.8, 0.8]
+    header_cols = [0.85, 1.25, 1.05, 0.75, 0.95, 0.95, 0.95, 0.95, 0.8, 0.8]
     hc = st.columns(header_cols)
-    hc[0].markdown("**Mode**")
-    hc[1].markdown("**Pseudo**")
-    hc[2].markdown("**Ligue**")
-    hc[3].markdown("**Atk**")
-    hc[4].markdown("**3⭐**")
-    hc[5].markdown("**2⭐**")
-    hc[6].markdown("**1⭐**")
-    hc[7].markdown("**0⭐**")
-    hc[8].markdown("**Atk Tr.**")
-    hc[9].markdown("**Total**")
+    hc[0].markdown("<p class='ranked-cell'><b>Mode</b></p>", unsafe_allow_html=True)
+    hc[1].markdown("<p class='ranked-cell'><b>Pseudo</b></p>", unsafe_allow_html=True)
+    hc[2].markdown("<p class='ranked-cell'><b>Ligue</b></p>", unsafe_allow_html=True)
+    hc[3].markdown("<p class='ranked-cell'><b>Atk</b></p>", unsafe_allow_html=True)
+    hc[4].markdown("<p class='ranked-cell'><b>3⭐</b></p>", unsafe_allow_html=True)
+    hc[5].markdown("<p class='ranked-cell'><b>2⭐</b></p>", unsafe_allow_html=True)
+    hc[6].markdown("<p class='ranked-cell'><b>1⭐</b></p>", unsafe_allow_html=True)
+    hc[7].markdown("<p class='ranked-cell'><b>0⭐</b></p>", unsafe_allow_html=True)
+    hc[8].markdown("<p class='ranked-cell'><b>Atk Tr.</b></p>", unsafe_allow_html=True)
+    hc[9].markdown("<p class='ranked-cell'><b>Total</b></p>", unsafe_allow_html=True)
 
-    st.markdown("---")
+    st.markdown("<hr>", unsafe_allow_html=True)
 
     for tag, name in accounts:
         acc_row = df_week[df_week["player_tag"] == tag]
@@ -252,7 +285,7 @@ def render_overview(conn, accounts):
                 st.rerun()
 
         with cols[1]:
-            st.markdown(f"<p style='margin:0; padding-top:6px;'>{name}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p class='ranked-cell'>{name}</p>", unsafe_allow_html=True)
 
         with cols[2]:
             new_league = st.selectbox("", LEAGUE_LEVELS, index=LEAGUE_LEVELS.index(league) if league in LEAGUE_LEVELS else 0, key=f"l_{tag}", label_visibility="collapsed")
@@ -262,18 +295,18 @@ def render_overview(conn, accounts):
                 st.rerun()
 
         with cols[3]:
-            st.markdown(f"<p style='margin:0; padding-top:6px;'>{total_attacks}/{quota}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p class='ranked-cell'>{total_attacks}/{quota}</p>", unsafe_allow_html=True)
 
         with cols[4]:
-            sc1, sc2 = st.columns([1, 1])
-            sc1.markdown(f"<p style='margin:0; padding-top:6px;'>{s3}</p>", unsafe_allow_html=True)
+            sc1, sc2 = st.columns([0.8, 1])
+            sc1.markdown(f"<p class='ranked-cell'>{s3}</p>", unsafe_allow_html=True)
             if sc2.button("+", key=f"b3_{tag}"):
                 _add_attack(conn, tag, current_week_key, 3, 100.0, new_mode)
                 st.rerun()
 
         with cols[5]:
-            sc1, sc2 = st.columns([1, 1])
-            sc1.markdown(f"<p style='margin:0; padding-top:6px;'>{s2}</p>", unsafe_allow_html=True)
+            sc1, sc2 = st.columns([0.8, 1])
+            sc1.markdown(f"<p class='ranked-cell'>{s2}</p>", unsafe_allow_html=True)
             if sc2.button("+", key=f"b2_{tag}"):
                 if new_mode == "Globale":
                     _add_attack(conn, tag, current_week_key, 2, 75.0, new_mode)
@@ -282,8 +315,8 @@ def render_overview(conn, accounts):
                     st.session_state[f"p_atk_{tag}"] = 2
 
         with cols[6]:
-            sc1, sc2 = st.columns([1, 1])
-            sc1.markdown(f"<p style='margin:0; padding-top:6px;'>{s1}</p>", unsafe_allow_html=True)
+            sc1, sc2 = st.columns([0.8, 1])
+            sc1.markdown(f"<p class='ranked-cell'>{s1}</p>", unsafe_allow_html=True)
             if sc2.button("+", key=f"b1_{tag}"):
                 if new_mode == "Globale":
                     _add_attack(conn, tag, current_week_key, 1, 50.0, new_mode)
@@ -292,8 +325,8 @@ def render_overview(conn, accounts):
                     st.session_state[f"p_atk_{tag}"] = 1
 
         with cols[7]:
-            sc1, sc2 = st.columns([1, 1])
-            sc1.markdown(f"<p style='margin:0; padding-top:6px;'>{s0_count}</p>", unsafe_allow_html=True)
+            sc1, sc2 = st.columns([0.8, 1])
+            sc1.markdown(f"<p class='ranked-cell'>{s0_count}</p>", unsafe_allow_html=True)
             if sc2.button("+", key=f"b0_{tag}"):
                 if new_mode == "Globale":
                     _add_attack(conn, tag, current_week_key, 0, 20.0, new_mode)
@@ -302,10 +335,10 @@ def render_overview(conn, accounts):
                     st.session_state[f"p_atk_{tag}"] = 0
 
         with cols[8]:
-            st.markdown(f"<p style='margin:0; padding-top:6px;'>{t_atk:+.0f}</p>", unsafe_allow_html=True)
+            st.markdown(f"<p class='ranked-cell'>{t_atk:+.0f}</p>", unsafe_allow_html=True)
 
         with cols[9]:
-            st.markdown(f"<p style='margin:0; padding-top:6px;'><b>{total_trophies:+.0f}</b></p>", unsafe_allow_html=True)
+            st.markdown(f"<p class='ranked-cell'><b>{total_trophies:+.0f}</b></p>", unsafe_allow_html=True)
 
         if st.session_state.get(f"p_atk_{tag}") is not None:
             star_val = st.session_state[f"p_atk_{tag}"]
@@ -319,7 +352,7 @@ def render_overview(conn, accounts):
                     st.session_state.pop(f"p_atk_{tag}", None)
                     st.rerun()
 
-        st.markdown("<hr style='margin: 0.1rem 0 !important;'>", unsafe_allow_html=True)
+        st.markdown("<hr>", unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------------------
