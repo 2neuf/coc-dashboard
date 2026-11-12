@@ -175,7 +175,7 @@ def render_mode_ranked():
 
 
 # ---------------------------------------------------------------------------
-# Vue d'ensemble & Tableau Ongoing Minimaliste
+# Vue d'ensemble & Tableau Ongoing Ultra-Compact
 # ---------------------------------------------------------------------------
 def render_overview(conn, accounts):
     c_m, c_w = st.columns(2)
@@ -193,20 +193,19 @@ def render_overview(conn, accounts):
 
     st.markdown("---")
     
-    # En-tête du tableau compact
-    header_cols = [1.2, 1.2, 1.8, 1.0, 1.8, 0.8, 0.8, 0.8, 0.8, 1.0, 1.0]
+    # Largeurs optimisées et resserrées : [Mode, Pseudo, Ligue, Atk, 3⭐, 2⭐, 1⭐, 0⭐, Atk Tr., Total]
+    header_cols = [0.8, 1.2, 1.0, 0.8, 1.0, 1.0, 1.0, 1.0, 0.8, 0.8]
     hc = st.columns(header_cols)
     hc[0].markdown("**Mode**")
     hc[1].markdown("**Pseudo**")
     hc[2].markdown("**Ligue**")
     hc[3].markdown("**Atk**")
-    hc[4].markdown("**Action Atk (+)**")
-    hc[5].markdown("**3⭐**")
-    hc[6].markdown("**2⭐**")
-    hc[7].markdown("**1⭐**")
-    hc[8].markdown("**0⭐**")
-    hc[9].markdown("**Atk Tr.**")
-    hc[10].markdown("**Total**")
+    hc[4].markdown("**3⭐ (+)**")
+    hc[5].markdown("**2⭐ (+)**")
+    hc[6].markdown("**1⭐ (+)**")
+    hc[7].markdown("**0⭐ (+)**")
+    hc[8].markdown("**Atk Tr.**")
+    hc[9].markdown("**Total**")
 
     st.markdown("---")
 
@@ -215,7 +214,6 @@ def render_overview(conn, accounts):
         
         if acc_row.empty:
             league = "18"
-            attacks_done = 0
             s3, s2, s1 = 0, 0, 0
             s0_count = 0
             t_atk = 0.0
@@ -236,18 +234,20 @@ def render_overview(conn, accounts):
         total_attacks = s3 + s2 + s1 + s0_count
         total_trophies = t_atk + t_def
 
-        # Ligne compacte du tableau
         cols = st.columns(header_cols)
         
+        # 1. Mode (Globale / Précis) - Mini sélecteur
         with cols[0]:
             new_mode = st.selectbox("", ["Globale", "Précis"], index=0 if tracking_mode == "Globale" else 1, key=f"m_{tag}", label_visibility="collapsed")
             if new_mode != tracking_mode:
                 _save_field(conn, tag, current_week_key, tracking_mode=new_mode)
                 st.rerun()
 
+        # 2. Pseudo
         with cols[1]:
             st.text(name)
 
+        # 3. Ligue - Mini sélecteur resserré
         with cols[2]:
             new_league = st.selectbox("", LEAGUE_LEVELS, index=LEAGUE_LEVELS.index(league) if league in LEAGUE_LEVELS else 0, key=f"l_{tag}", label_visibility="collapsed")
             if new_league != league:
@@ -255,44 +255,53 @@ def render_overview(conn, accounts):
                 _save_field(conn, tag, current_week_key, league_level=new_league, attacks_max=new_quota, def_max=new_quota)
                 st.rerun()
 
+        # 4. Total Attaques
         with cols[3]:
             st.text(f"{total_attacks}/{quota}")
 
+        # 5. Colonne 3⭐ avec son bouton d'ajout direct
         with cols[4]:
-            b3, b2, b1, b0 = st.columns(4)
-            if b3.button("3+", key=f"b3_{tag}"):
+            st.text(f"{s3}")
+            if st.button("3+", key=f"b3_{tag}"):
                 _add_attack(conn, tag, current_week_key, 3, 100.0, new_mode)
                 st.rerun()
-            if b2.button("2+", key=f"b2_{tag}"):
+
+        # 6. Colonne 2⭐ avec son bouton d'ajout direct
+        with cols[5]:
+            st.text(f"{s2}")
+            if st.button("2+", key=f"b2_{tag}"):
                 if new_mode == "Globale":
                     _add_attack(conn, tag, current_week_key, 2, 75.0, new_mode)
                     st.rerun()
                 else:
                     st.session_state[f"p_atk_{tag}"] = 2
-            if b1.button("1+", key=f"b1_{tag}"):
+
+        # 7. Colonne 1⭐ avec son bouton d'ajout direct
+        with cols[6]:
+            st.text(f"{s1}")
+            if st.button("1+", key=f"b1_{tag}"):
                 if new_mode == "Globale":
                     _add_attack(conn, tag, current_week_key, 1, 50.0, new_mode)
                     st.rerun()
                 else:
                     st.session_state[f"p_atk_{tag}"] = 1
-            if b0.button("0+", key=f"b0_{tag}"):
+
+        # 8. Colonne 0⭐ avec son bouton d'ajout direct
+        with cols[7]:
+            st.text(f"{s0_count}")
+            if st.button("0+", key=f"b0_{tag}"):
                 if new_mode == "Globale":
                     _add_attack(conn, tag, current_week_key, 0, 20.0, new_mode)
                     st.rerun()
                 else:
                     st.session_state[f"p_atk_{tag}"] = 0
 
-        with cols[5]:
-            st.text(str(s3))
-        with cols[6]:
-            st.text(str(s2))
-        with cols[7]:
-            st.text(str(s1))
+        # 9. Trophées Atk
         with cols[8]:
-            st.text(str(s0_count))
-        with cols[9]:
             st.text(f"{t_atk:+.0f}")
-        with cols[10]:
+
+        # 10. Total Trophées
+        with cols[9]:
             st.text(f"{total_trophies:+.0f}")
 
         # Popup mini pour le mode précis si activé
@@ -300,8 +309,8 @@ def render_overview(conn, accounts):
             star_val = st.session_state[f"p_atk_{tag}"]
             with st.form(key=f"f_prec_{tag}"):
                 st.markdown(f"**Pourcentage de destruction ({star_val} ⭐) pour {name} :**")
-                max_l = 49 if star_val == 0 else (99 if star_val in [1, 2] else 100)
                 min_l = 0 if star_val == 0 else (1 if star_val == 1 else 50)
+                max_l = 49 if star_val == 0 else (99 if star_val in [1, 2] else 100)
                 pct = st.number_input("Destruction %", min_value=min_l, max_value=max_l, value=min_l)
                 if st.form_submit_button("Valider"):
                     _add_attack(conn, tag, current_week_key, star_val, float(pct), "Précis")
@@ -312,7 +321,7 @@ def render_overview(conn, accounts):
 
 
 # ---------------------------------------------------------------------------
-# Fonctions de mise à jour
+# Fonctions de mise à jour et formulaire a posteriori
 # ---------------------------------------------------------------------------
 def _save_field(conn, tag, week_key, **kwargs):
     existing = fetch_ranked(conn, tag, week_key)
@@ -381,9 +390,6 @@ def _add_attack(conn, tag, week_key, stars, destruction_pct, mode):
     ])
 
 
-# ---------------------------------------------------------------------------
-# Formulaire Saisie Avancée a posteriori (inchangé)
-# ---------------------------------------------------------------------------
 def render_form(conn, accounts):
     flash = st.session_state.pop("ranked_flash", None)
     if flash:
@@ -408,10 +414,6 @@ def render_form(conn, accounts):
     st.info(f"📌 Ligue **{league}** : **{quota} attaques** par semaine.")
 
     ex_atk = [_loads(existing.get(f"stars_{i}_details"), []) if existing else [] for i in range(3)]
-    ex_def_pcts = []
-    for i in range(3):
-        d_data = _loads(existing.get(f"def_{i}_details"), {}) if existing else {}
-        ex_def_pcts.append(d_data.get("pct", []) if isinstance(d_data, dict) else (d_data if isinstance(d_data, list) else []))
 
     st.markdown("### 🏹 Attaques (Saisie complète)")
     ca = st.columns(3)
