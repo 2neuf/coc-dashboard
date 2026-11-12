@@ -146,6 +146,16 @@ def calculate_defense_trophies(stars, destruction_pct, is_global=False):
 # Point d'entrée
 # ---------------------------------------------------------------------------
 def render_mode_ranked():
+    # Injection CSS pour réduire drastiquement les marges et compacter les lignes
+    st.markdown("""
+        <style>
+            div.block-container { padding-top: 1rem; padding-bottom: 1rem; }
+            hr { margin: 0.3rem 0px !important; border-color: #333 !important; }
+            .stButton button { padding: 0.1rem 0.4rem !important; min-height: 1.5rem !important; font-size: 0.8rem !important; }
+            div[data-baseweb="select"] > div { min-height: 2rem !important; padding-top: 0px !important; padding-bottom: 0px !important; }
+        </style>
+    """, unsafe_allow_html=True)
+
     st.subheader("⚔️ Ligues Classées")
 
     try:
@@ -235,18 +245,15 @@ def render_overview(conn, accounts):
 
         cols = st.columns(header_cols)
         
-        # 1. Mode
         with cols[0]:
             new_mode = st.selectbox("", ["Globale", "Précis"], index=0 if tracking_mode == "Globale" else 1, key=f"m_{tag}", label_visibility="collapsed")
             if new_mode != tracking_mode:
                 _save_field(conn, tag, current_week_key, tracking_mode=new_mode)
                 st.rerun()
 
-        # 2. Pseudo
         with cols[1]:
-            st.text(name)
+            st.markdown(f"<p style='margin:0; padding-top:6px;'>{name}</p>", unsafe_allow_html=True)
 
-        # 3. Ligue
         with cols[2]:
             new_league = st.selectbox("", LEAGUE_LEVELS, index=LEAGUE_LEVELS.index(league) if league in LEAGUE_LEVELS else 0, key=f"l_{tag}", label_visibility="collapsed")
             if new_league != league:
@@ -254,22 +261,19 @@ def render_overview(conn, accounts):
                 _save_field(conn, tag, current_week_key, league_level=new_league, attacks_max=new_quota, def_max=new_quota)
                 st.rerun()
 
-        # 4. Total Attaques
         with cols[3]:
-            st.text(f"{total_attacks}/{quota}")
+            st.markdown(f"<p style='margin:0; padding-top:6px;'>{total_attacks}/{quota}</p>", unsafe_allow_html=True)
 
-        # 5. 3⭐ et son bouton "+" aligné sur la même ligne
         with cols[4]:
             sc1, sc2 = st.columns([1, 1])
-            sc1.text(str(s3))
+            sc1.markdown(f"<p style='margin:0; padding-top:6px;'>{s3}</p>", unsafe_allow_html=True)
             if sc2.button("+", key=f"b3_{tag}"):
                 _add_attack(conn, tag, current_week_key, 3, 100.0, new_mode)
                 st.rerun()
 
-        # 6. 2⭐ et son bouton "+" aligné sur la même ligne
         with cols[5]:
             sc1, sc2 = st.columns([1, 1])
-            sc1.text(str(s2))
+            sc1.markdown(f"<p style='margin:0; padding-top:6px;'>{s2}</p>", unsafe_allow_html=True)
             if sc2.button("+", key=f"b2_{tag}"):
                 if new_mode == "Globale":
                     _add_attack(conn, tag, current_week_key, 2, 75.0, new_mode)
@@ -277,10 +281,9 @@ def render_overview(conn, accounts):
                 else:
                     st.session_state[f"p_atk_{tag}"] = 2
 
-        # 7. 1⭐ et son bouton "+" aligné sur la même ligne
         with cols[6]:
             sc1, sc2 = st.columns([1, 1])
-            sc1.text(str(s1))
+            sc1.markdown(f"<p style='margin:0; padding-top:6px;'>{s1}</p>", unsafe_allow_html=True)
             if sc2.button("+", key=f"b1_{tag}"):
                 if new_mode == "Globale":
                     _add_attack(conn, tag, current_week_key, 1, 50.0, new_mode)
@@ -288,10 +291,9 @@ def render_overview(conn, accounts):
                 else:
                     st.session_state[f"p_atk_{tag}"] = 1
 
-        # 8. 0⭐ et son bouton "+" aligné sur la même ligne
         with cols[7]:
             sc1, sc2 = st.columns([1, 1])
-            sc1.text(str(s0_count))
+            sc1.markdown(f"<p style='margin:0; padding-top:6px;'>{s0_count}</p>", unsafe_allow_html=True)
             if sc2.button("+", key=f"b0_{tag}"):
                 if new_mode == "Globale":
                     _add_attack(conn, tag, current_week_key, 0, 20.0, new_mode)
@@ -299,15 +301,12 @@ def render_overview(conn, accounts):
                 else:
                     st.session_state[f"p_atk_{tag}"] = 0
 
-        # 9. Trophées Atk
         with cols[8]:
-            st.text(f"{t_atk:+.0f}")
+            st.markdown(f"<p style='margin:0; padding-top:6px;'>{t_atk:+.0f}</p>", unsafe_allow_html=True)
 
-        # 10. Total
         with cols[9]:
-            st.text(f"{total_trophies:+.0f}")
+            st.markdown(f"<p style='margin:0; padding-top:6px;'><b>{total_trophies:+.0f}</b></p>", unsafe_allow_html=True)
 
-        # Popup mini pour le mode précis
         if st.session_state.get(f"p_atk_{tag}") is not None:
             star_val = st.session_state[f"p_atk_{tag}"]
             with st.form(key=f"f_prec_{tag}"):
@@ -320,7 +319,7 @@ def render_overview(conn, accounts):
                     st.session_state.pop(f"p_atk_{tag}", None)
                     st.rerun()
 
-        st.markdown("---")
+        st.markdown("<hr style='margin: 0.1rem 0 !important;'>", unsafe_allow_html=True)
 
 
 # ---------------------------------------------------------------------------
