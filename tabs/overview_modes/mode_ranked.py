@@ -146,19 +146,12 @@ def calculate_defense_trophies(stars, destruction_pct, is_global=False):
 # Point d'entrée
 # ---------------------------------------------------------------------------
 def render_mode_ranked():
-    # CSS sur-mesure : compactage vertical maximal + alignement hauteur combolist + police agrandie
     st.markdown("""
         <style>
             div.block-container { padding-top: 1rem; padding-bottom: 1rem; }
-            
-            /* Suppression des espacements entre les lignes de colonnes */
             [data-testid="stVerticalBlock"] { gap: 0.15rem !important; }
             [data-testid="stHorizontalBlock"] { align-items: center !important; }
-            
-            /* Lignes séparatrices ultra-fines */
             hr { margin: 0.1rem 0px !important; border-color: #2c2c2c !important; }
-            
-            /* Uniformisation de la hauteur et de la police des boutons '+' avec les listes déroulantes */
             .stButton button { 
                 padding: 0px 0.55rem !important; 
                 height: 36px !important; 
@@ -167,8 +160,6 @@ def render_mode_ranked():
                 font-weight: bold !important;
                 line-height: 36px !important;
             }
-            
-            /* Uniformisation de la hauteur et de la police des listes déroulantes */
             div[data-baseweb="select"] > div { 
                 min-height: 36px !important; 
                 height: 36px !important;
@@ -176,8 +167,6 @@ def render_mode_ranked():
                 padding-bottom: 0px !important; 
                 font-size: 1rem !important;
             }
-            
-            /* Style des cellules texte alignées sur 36px */
             .ranked-cell {
                 margin: 0 !important;
                 padding: 0 !important;
@@ -236,7 +225,7 @@ def render_overview(conn, accounts):
 
     st.markdown("<hr>", unsafe_allow_html=True)
     
-    header_cols = [0.85, 1.25, 1.05, 0.75, 0.95, 0.95, 0.95, 0.95, 0.8, 0.8]
+    header_cols = [0.9, 1.25, 1.05, 0.75, 0.95, 0.95, 0.95, 0.95, 0.8, 0.8]
     hc = st.columns(header_cols)
     hc[0].markdown("<p class='ranked-cell'><b>Mode</b></p>", unsafe_allow_html=True)
     hc[1].markdown("<p class='ranked-cell'><b>Pseudo</b></p>", unsafe_allow_html=True)
@@ -278,68 +267,97 @@ def render_overview(conn, accounts):
 
         cols = st.columns(header_cols)
         
+        # 1. Mode (Texte simple par défaut, affichage du selectbox si édition activée)
         with cols[0]:
-            new_mode = st.selectbox("", ["Globale", "Précis"], index=0 if tracking_mode == "Globale" else 1, key=f"m_{tag}", label_visibility="collapsed")
-            if new_mode != tracking_mode:
-                _save_field(conn, tag, current_week_key, tracking_mode=new_mode)
-                st.rerun()
+            edit_mode_key = f"edit_m_{tag}"
+            if st.session_state.get(edit_mode_key, False):
+                new_mode = st.selectbox("", ["Globale", "Précis"], index=0 if tracking_mode == "Globale" else 1, key=f"m_{tag}", label_visibility="collapsed")
+                if new_mode != tracking_mode:
+                    _save_field(conn, tag, current_week_key, tracking_mode=new_mode)
+                    st.session_state[edit_mode_key] = False
+                    st.rerun()
+            else:
+                mc1, mc2 = st.columns([2, 1])
+                mc1.markdown(f"<p class='ranked-cell' style='font-size:0.9rem;'>{tracking_mode}</p>", unsafe_allow_html=True)
+                if mc2.button("✏️", key=f"btn_m_{tag}"):
+                    st.session_state[edit_mode_key] = True
+                    st.rerun()
 
+        # 2. Pseudo
         with cols[1]:
             st.markdown(f"<p class='ranked-cell'>{name}</p>", unsafe_allow_html=True)
 
+        # 3. Ligue (Texte simple par défaut, affichage du selectbox si édition activée)
         with cols[2]:
-            new_league = st.selectbox("", LEAGUE_LEVELS, index=LEAGUE_LEVELS.index(league) if league in LEAGUE_LEVELS else 0, key=f"l_{tag}", label_visibility="collapsed")
-            if new_league != league:
-                new_quota = LEAGUE_ATTACK_QUOTAS.get(new_league, 14)
-                _save_field(conn, tag, current_week_key, league_level=new_league, attacks_max=new_quota, def_max=new_quota)
-                st.rerun()
+            edit_lg_key = f"edit_l_{tag}"
+            if st.session_state.get(edit_lg_key, False):
+                new_league = st.selectbox("", LEAGUE_LEVELS, index=LEAGUE_LEVELS.index(league) if league in LEAGUE_LEVELS else 0, key=f"l_{tag}", label_visibility="collapsed")
+                if new_league != league:
+                    new_quota = LEAGUE_ATTACK_QUOTAS.get(new_league, 14)
+                    _save_field(conn, tag, current_week_key, league_level=new_league, attacks_max=new_quota, def_max=new_quota)
+                    st.session_state[edit_lg_key] = False
+                    st.rerun()
+            else:
+                lc1, lc2 = st.columns([2, 1])
+                lc1.markdown(f"<p class='ranked-cell' style='font-size:0.9rem;'>{league}</p>", unsafe_allow_html=True)
+                if lc2.button("✏️", key=f"btn_l_{tag}"):
+                    st.session_state[edit_lg_key] = True
+                    st.rerun()
 
+        # 4. Total Attaques
         with cols[3]:
             st.markdown(f"<p class='ranked-cell'>{total_attacks}/{quota}</p>", unsafe_allow_html=True)
 
+        # 5. 3⭐ et son bouton "+"
         with cols[4]:
             sc1, sc2 = st.columns([0.8, 1])
             sc1.markdown(f"<p class='ranked-cell'>{s3}</p>", unsafe_allow_html=True)
             if sc2.button("+", key=f"b3_{tag}"):
-                _add_attack(conn, tag, current_week_key, 3, 100.0, new_mode)
+                _add_attack(conn, tag, current_week_key, 3, 100.0, tracking_mode)
                 st.rerun()
 
+        # 6. 2⭐ et son bouton "+"
         with cols[5]:
             sc1, sc2 = st.columns([0.8, 1])
             sc1.markdown(f"<p class='ranked-cell'>{s2}</p>", unsafe_allow_html=True)
             if sc2.button("+", key=f"b2_{tag}"):
-                if new_mode == "Globale":
-                    _add_attack(conn, tag, current_week_key, 2, 75.0, new_mode)
+                if tracking_mode == "Globale":
+                    _add_attack(conn, tag, current_week_key, 2, 75.0, tracking_mode)
                     st.rerun()
                 else:
                     st.session_state[f"p_atk_{tag}"] = 2
 
+        # 7. 1⭐ et son bouton "+"
         with cols[6]:
             sc1, sc2 = st.columns([0.8, 1])
             sc1.markdown(f"<p class='ranked-cell'>{s1}</p>", unsafe_allow_html=True)
             if sc2.button("+", key=f"b1_{tag}"):
-                if new_mode == "Globale":
-                    _add_attack(conn, tag, current_week_key, 1, 50.0, new_mode)
+                if tracking_mode == "Globale":
+                    _add_attack(conn, tag, current_week_key, 1, 50.0, tracking_mode)
                     st.rerun()
                 else:
                     st.session_state[f"p_atk_{tag}"] = 1
 
+        # 8. 0⭐ et son bouton "+"
         with cols[7]:
             sc1, sc2 = st.columns([0.8, 1])
             sc1.markdown(f"<p class='ranked-cell'>{s0_count}</p>", unsafe_allow_html=True)
             if sc2.button("+", key=f"b0_{tag}"):
-                if new_mode == "Globale":
-                    _add_attack(conn, tag, current_week_key, 0, 20.0, new_mode)
+                if tracking_mode == "Globale":
+                    _add_attack(conn, tag, current_week_key, 0, 20.0, tracking_mode)
                     st.rerun()
                 else:
                     st.session_state[f"p_atk_{tag}"] = 0
 
+        # 9. Trophées Atk
         with cols[8]:
             st.markdown(f"<p class='ranked-cell'>{t_atk:+.0f}</p>", unsafe_allow_html=True)
 
+        # 10. Total
         with cols[9]:
             st.markdown(f"<p class='ranked-cell'><b>{total_trophies:+.0f}</b></p>", unsafe_allow_html=True)
 
+        # Popup mini pour le mode précis
         if st.session_state.get(f"p_atk_{tag}") is not None:
             star_val = st.session_state[f"p_atk_{tag}"]
             with st.form(key=f"f_prec_{tag}"):
@@ -348,7 +366,7 @@ def render_overview(conn, accounts):
                 max_l = 49 if star_val == 0 else (99 if star_val in [1, 2] else 100)
                 pct = st.number_input("Destruction %", min_value=min_l, max_value=max_l, value=min_l)
                 if st.form_submit_button("Valider"):
-                    _add_attack(conn, tag, current_week_key, star_val, float(pct), "Précis")
+                    _add_attack(conn, tag, current_week_key, star_val, float(pct), tracking_mode)
                     st.session_state.pop(f"p_atk_{tag}", None)
                     st.rerun()
 
