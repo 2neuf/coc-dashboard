@@ -43,23 +43,32 @@ if not st.session_state["app_fully_loaded"]:
 
         st.sidebar.markdown(f"**Pseudo : {player_name} Tag : {current_tag}**")
 
-        # Récupération des données API du joueur et stockage en session
+        # Récupération des données API du joueur et stockage en session (Gestion propre sans erreur rouge bloquante)
         data, error = fetch_player_data(current_tag)
         if error:
-            st.error(f"❌ Erreur lors de la récupération des données de l'API : {error}")
+            st.session_state["api_connected"] = False
             data = {}
+        else:
+            st.session_state["api_connected"] = True
 
         st.session_state["cached_player_data"] = data
         st.session_state["cached_favorites"] = get_db_favorites()
         st.session_state["current_tag"] = current_tag
         st.session_state["player_name"] = player_name
 
+        # Indicateur de statut discret dans la sidebar
+        st.sidebar.markdown("---")
+        if st.session_state.get("api_connected", True):
+            st.sidebar.success("🟢 API : Connectée")
+        else:
+            st.sidebar.warning("🟠 API : Hors-ligne / Erreur")
+
        # Préchargement des données de la Ligue de Guerre de Clan (CWL)
         CLAN_TAG = "#2U0GCGPJU"
         league_data, league_error = fetch_clan_war_league(CLAN_TAG)
         st.session_state["cached_league_data"] = league_data
 
-        # Archivage automatique de la ligue du mois en cours (ex: "Novembre") si l'API renvoie des guerres
+        # Archivage automatique de la ligue du mois en cours si l'API renvoie des guerres
         if league_data and league_data.get("wars"):
             save_league_archive("Novembre", league_data.get("wars"))
 
