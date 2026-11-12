@@ -193,7 +193,6 @@ def render_overview(conn, accounts):
 
     st.markdown("---")
     
-    # 10 colonnes resserrées et alignées
     header_cols = [0.8, 1.2, 1.0, 0.8, 1.0, 1.0, 1.0, 1.0, 0.8, 0.8]
     hc = st.columns(header_cols)
     hc[0].markdown("**Mode**")
@@ -236,7 +235,7 @@ def render_overview(conn, accounts):
 
         cols = st.columns(header_cols)
         
-        # 1. Mode (Globale / Précis)
+        # 1. Mode
         with cols[0]:
             new_mode = st.selectbox("", ["Globale", "Précis"], index=0 if tracking_mode == "Globale" else 1, key=f"m_{tag}", label_visibility="collapsed")
             if new_mode != tracking_mode:
@@ -259,37 +258,41 @@ def render_overview(conn, accounts):
         with cols[3]:
             st.text(f"{total_attacks}/{quota}")
 
-        # 5. 3⭐ + Bouton 3+
+        # 5. 3⭐ et son bouton "+" aligné sur la même ligne
         with cols[4]:
-            st.text(f"{s3}")
-            if st.button("3+", key=f"b3_{tag}"):
+            sc1, sc2 = st.columns([1, 1])
+            sc1.text(str(s3))
+            if sc2.button("+", key=f"b3_{tag}"):
                 _add_attack(conn, tag, current_week_key, 3, 100.0, new_mode)
                 st.rerun()
 
-        # 6. 2⭐ + Bouton 2+
+        # 6. 2⭐ et son bouton "+" aligné sur la même ligne
         with cols[5]:
-            st.text(f"{s2}")
-            if st.button("2+", key=f"b2_{tag}"):
+            sc1, sc2 = st.columns([1, 1])
+            sc1.text(str(s2))
+            if sc2.button("+", key=f"b2_{tag}"):
                 if new_mode == "Globale":
                     _add_attack(conn, tag, current_week_key, 2, 75.0, new_mode)
                     st.rerun()
                 else:
                     st.session_state[f"p_atk_{tag}"] = 2
 
-        # 7. 1⭐ + Bouton 1+
+        # 7. 1⭐ et son bouton "+" aligné sur la même ligne
         with cols[6]:
-            st.text(f"{s1}")
-            if st.button("1+", key=f"b1_{tag}"):
+            sc1, sc2 = st.columns([1, 1])
+            sc1.text(str(s1))
+            if sc2.button("+", key=f"b1_{tag}"):
                 if new_mode == "Globale":
                     _add_attack(conn, tag, current_week_key, 1, 50.0, new_mode)
                     st.rerun()
                 else:
                     st.session_state[f"p_atk_{tag}"] = 1
 
-        # 8. 0⭐ + Bouton 0+
+        # 8. 0⭐ et son bouton "+" aligné sur la même ligne
         with cols[7]:
-            st.text(f"{s0_count}")
-            if st.button("0+", key=f"b0_{tag}"):
+            sc1, sc2 = st.columns([1, 1])
+            sc1.text(str(s0_count))
+            if sc2.button("+", key=f"b0_{tag}"):
                 if new_mode == "Globale":
                     _add_attack(conn, tag, current_week_key, 0, 20.0, new_mode)
                     st.rerun()
