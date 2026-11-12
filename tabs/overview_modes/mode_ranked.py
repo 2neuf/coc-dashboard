@@ -153,26 +153,34 @@ def render_mode_ranked():
             [data-testid="stHorizontalBlock"] { align-items: center !important; }
             hr { margin: 0.05rem 0px !important; border-color: #2c2c2c !important; }
             
-            /* Boutons compacts alignés */
+            /* Forcer l'alignement horizontal parfait des sous-éléments dans les colonnes */
+            [data-testid="stHorizontalBlock"] > div {
+                display: flex !important;
+                align-items: center !important;
+                gap: 6px !important;
+            }
+            
+            /* Boutons compacts et alignés */
             .stButton button { 
-                padding: 0px 0.3rem !important; 
-                height: 30px !important; 
-                min-height: 30px !important; 
-                font-size: 0.9rem !important; 
+                padding: 0px 0.4rem !important; 
+                height: 28px !important; 
+                min-height: 28px !important; 
+                font-size: 0.85rem !important; 
                 font-weight: bold !important;
-                line-height: 30px !important;
+                line-height: 28px !important;
                 margin: 0 !important;
             }
             div[data-baseweb="select"] > div { 
-                min-height: 32px !important; 
-                height: 32px !important; 
-                font-size: 0.9rem !important;
+                min-height: 30px !important; 
+                height: 30px !important; 
+                font-size: 0.85rem !important;
             }
             .ranked-cell {
                 margin: 0 !important;
-                padding: 4px 0 !important;
-                font-size: 1rem !important;
+                padding: 2px 0 !important;
+                font-size: 0.95rem !important;
                 white-space: nowrap !important;
+                line-height: 28px !important;
             }
         </style>
     """, unsafe_allow_html=True)
@@ -276,8 +284,8 @@ def render_overview(conn, accounts):
                     st.session_state[edit_mode_key] = False
                     st.rerun()
             else:
-                mc1, mc2 = st.columns([2.2, 1])
-                mc1.markdown(f"<p class='ranked-cell' style='font-size:0.9rem;'>{tracking_mode}</p>", unsafe_allow_html=True)
+                mc1, mc2 = st.columns([2.5, 1])
+                mc1.markdown(f"<p class='ranked-cell'>{tracking_mode}</p>", unsafe_allow_html=True)
                 if mc2.button("✏️", key=f"btn_m_{tag}"):
                     st.session_state[edit_mode_key] = True
                     st.rerun()
@@ -297,8 +305,8 @@ def render_overview(conn, accounts):
                     st.session_state[edit_lg_key] = False
                     st.rerun()
             else:
-                lc1, lc2 = st.columns([2.2, 1])
-                lc1.markdown(f"<p class='ranked-cell' style='font-size:0.9rem;'>{league}</p>", unsafe_allow_html=True)
+                lc1, lc2 = st.columns([2.5, 1])
+                lc1.markdown(f"<p class='ranked-cell'>{league}</p>", unsafe_allow_html=True)
                 if lc2.button("✏️", key=f"btn_l_{tag}"):
                     st.session_state[edit_lg_key] = True
                     st.rerun()
