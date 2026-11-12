@@ -193,17 +193,17 @@ def render_overview(conn, accounts):
 
     st.markdown("---")
     
-    # Largeurs optimisées et resserrées : [Mode, Pseudo, Ligue, Atk, 3⭐, 2⭐, 1⭐, 0⭐, Atk Tr., Total]
+    # 10 colonnes resserrées et alignées
     header_cols = [0.8, 1.2, 1.0, 0.8, 1.0, 1.0, 1.0, 1.0, 0.8, 0.8]
     hc = st.columns(header_cols)
     hc[0].markdown("**Mode**")
     hc[1].markdown("**Pseudo**")
     hc[2].markdown("**Ligue**")
     hc[3].markdown("**Atk**")
-    hc[4].markdown("**3⭐ (+)**")
-    hc[5].markdown("**2⭐ (+)**")
-    hc[6].markdown("**1⭐ (+)**")
-    hc[7].markdown("**0⭐ (+)**")
+    hc[4].markdown("**3⭐**")
+    hc[5].markdown("**2⭐**")
+    hc[6].markdown("**1⭐**")
+    hc[7].markdown("**0⭐**")
     hc[8].markdown("**Atk Tr.**")
     hc[9].markdown("**Total**")
 
@@ -236,7 +236,7 @@ def render_overview(conn, accounts):
 
         cols = st.columns(header_cols)
         
-        # 1. Mode (Globale / Précis) - Mini sélecteur
+        # 1. Mode (Globale / Précis)
         with cols[0]:
             new_mode = st.selectbox("", ["Globale", "Précis"], index=0 if tracking_mode == "Globale" else 1, key=f"m_{tag}", label_visibility="collapsed")
             if new_mode != tracking_mode:
@@ -247,7 +247,7 @@ def render_overview(conn, accounts):
         with cols[1]:
             st.text(name)
 
-        # 3. Ligue - Mini sélecteur resserré
+        # 3. Ligue
         with cols[2]:
             new_league = st.selectbox("", LEAGUE_LEVELS, index=LEAGUE_LEVELS.index(league) if league in LEAGUE_LEVELS else 0, key=f"l_{tag}", label_visibility="collapsed")
             if new_league != league:
@@ -259,14 +259,14 @@ def render_overview(conn, accounts):
         with cols[3]:
             st.text(f"{total_attacks}/{quota}")
 
-        # 5. Colonne 3⭐ avec son bouton d'ajout direct
+        # 5. 3⭐ + Bouton 3+
         with cols[4]:
             st.text(f"{s3}")
             if st.button("3+", key=f"b3_{tag}"):
                 _add_attack(conn, tag, current_week_key, 3, 100.0, new_mode)
                 st.rerun()
 
-        # 6. Colonne 2⭐ avec son bouton d'ajout direct
+        # 6. 2⭐ + Bouton 2+
         with cols[5]:
             st.text(f"{s2}")
             if st.button("2+", key=f"b2_{tag}"):
@@ -276,7 +276,7 @@ def render_overview(conn, accounts):
                 else:
                     st.session_state[f"p_atk_{tag}"] = 2
 
-        # 7. Colonne 1⭐ avec son bouton d'ajout direct
+        # 7. 1⭐ + Bouton 1+
         with cols[6]:
             st.text(f"{s1}")
             if st.button("1+", key=f"b1_{tag}"):
@@ -286,7 +286,7 @@ def render_overview(conn, accounts):
                 else:
                     st.session_state[f"p_atk_{tag}"] = 1
 
-        # 8. Colonne 0⭐ avec son bouton d'ajout direct
+        # 8. 0⭐ + Bouton 0+
         with cols[7]:
             st.text(f"{s0_count}")
             if st.button("0+", key=f"b0_{tag}"):
@@ -300,11 +300,11 @@ def render_overview(conn, accounts):
         with cols[8]:
             st.text(f"{t_atk:+.0f}")
 
-        # 10. Total Trophées
+        # 10. Total
         with cols[9]:
             st.text(f"{total_trophies:+.0f}")
 
-        # Popup mini pour le mode précis si activé
+        # Popup mini pour le mode précis
         if st.session_state.get(f"p_atk_{tag}") is not None:
             star_val = st.session_state[f"p_atk_{tag}"]
             with st.form(key=f"f_prec_{tag}"):
