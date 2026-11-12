@@ -149,33 +149,29 @@ def render_mode_ranked():
     st.markdown("""
         <style>
             div.block-container { padding-top: 1rem; padding-bottom: 1rem; }
-            [data-testid="stVerticalBlock"] { gap: 0.1rem !important; }
+            [data-testid="stVerticalBlock"] { gap: 0rem !important; }
             [data-testid="stHorizontalBlock"] { align-items: center !important; }
-            hr { margin: 0.1rem 0px !important; border-color: #2c2c2c !important; }
+            hr { margin: 0.05rem 0px !important; border-color: #2c2c2c !important; }
             
-            /* Alignement précis et hauteur uniforme des boutons */
+            /* Boutons compacts alignés */
             .stButton button { 
-                padding: 0px 0.4rem !important; 
-                height: 32px !important; 
-                min-height: 32px !important; 
-                font-size: 1rem !important; 
+                padding: 0px 0.3rem !important; 
+                height: 30px !important; 
+                min-height: 30px !important; 
+                font-size: 0.9rem !important; 
                 font-weight: bold !important;
-                line-height: 32px !important;
-                margin-top: -4px !important;
+                line-height: 30px !important;
+                margin: 0 !important;
             }
             div[data-baseweb="select"] > div { 
-                min-height: 34px !important; 
-                height: 34px !important;
-                padding-top: 0px !important; 
-                padding-bottom: 0px !important; 
-                font-size: 0.95rem !important;
+                min-height: 32px !important; 
+                height: 32px !important; 
+                font-size: 0.9rem !important;
             }
             .ranked-cell {
                 margin: 0 !important;
-                padding: 0 !important;
-                height: 34px !important;
-                line-height: 34px !important;
-                font-size: 1.05rem !important;
+                padding: 4px 0 !important;
+                font-size: 1rem !important;
                 white-space: nowrap !important;
             }
         </style>
@@ -311,7 +307,7 @@ def render_overview(conn, accounts):
         with cols[3]:
             st.markdown(f"<p class='ranked-cell'>{total_attacks}/{quota}</p>", unsafe_allow_html=True)
 
-        # 5. 3⭐ et son bouton "+" parfaitement alignés
+        # 5. 3⭐
         with cols[4]:
             sc1, sc2 = st.columns([1, 1])
             sc1.markdown(f"<p class='ranked-cell'>{s3}</p>", unsafe_allow_html=True)
@@ -319,7 +315,7 @@ def render_overview(conn, accounts):
                 _add_attack(conn, tag, current_week_key, 3, 100.0, tracking_mode)
                 st.rerun()
 
-        # 6. 2⭐ et son bouton "+" parfaitement alignés
+        # 6. 2⭐
         with cols[5]:
             sc1, sc2 = st.columns([1, 1])
             sc1.markdown(f"<p class='ranked-cell'>{s2}</p>", unsafe_allow_html=True)
@@ -330,7 +326,7 @@ def render_overview(conn, accounts):
                 else:
                     st.session_state[f"p_atk_{tag}"] = 2
 
-        # 7. 1⭐ et son bouton "+" parfaitement alignés
+        # 7. 1⭐
         with cols[6]:
             sc1, sc2 = st.columns([1, 1])
             sc1.markdown(f"<p class='ranked-cell'>{s1}</p>", unsafe_allow_html=True)
@@ -341,7 +337,7 @@ def render_overview(conn, accounts):
                 else:
                     st.session_state[f"p_atk_{tag}"] = 1
 
-        # 8. 0⭐ et son bouton "+" parfaitement alignés
+        # 8. 0⭐
         with cols[7]:
             sc1, sc2 = st.columns([1, 1])
             sc1.markdown(f"<p class='ranked-cell'>{s0_count}</p>", unsafe_allow_html=True)
@@ -490,7 +486,7 @@ def render_form(conn, accounts):
 
     if submitted:
         flat_atk = [p for sub in atk_pcts for p in sub] + ([100.0] * nb_3_star)
-        avg_dest = sum(flat_tk) / len(flat_atk) if flat_atk else 0.0
+        avg_dest = sum(flat_atk) / len(flat_atk) if flat_atk else 0.0
         t_atk = sum(calculate_attack_trophies(0, p) for p in atk_pcts[0]) + \
                 sum(calculate_attack_trophies(1, p) for p in atk_pcts[1]) + \
                 sum(calculate_attack_trophies(2, p) for p in atk_pcts[2]) + (nb_3_star * 40)
@@ -506,7 +502,6 @@ def render_form(conn, accounts):
                 league_level = excluded.league_level,
                 attacks_done = excluded.attacks_done,
                 stars_3 = excluded.stars_3,
-                stars_2 = excluded.stars_2,
                 stars_1 = excluded.stars_1,
                 avg_destruction = excluded.avg_destruction,
                 trophies_attack = excluded.trophies_attack
